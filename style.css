@@ -1,0 +1,13 @@
+.input-wrapper {
+    position: relative;
+}
+
+.score-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px;
+    font-size: 12px;
+    display: none; /* Initially hidden */
+}
