@@ -1,0 +1,13 @@
+numpy
+redis[hiredis]
+pika
+uvicorn[standard]
+fastapi
+gensim
+invisible_watermark 
+transformers 
+accelerate 
+safetensors
+diffusers
+pillow
+nltk

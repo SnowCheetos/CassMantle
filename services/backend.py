@@ -3,7 +3,6 @@ import json
 import pika
 import uuid
 import random
-import gensim.downloader
 
 import numpy as np
 
