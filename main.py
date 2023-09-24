@@ -2,7 +2,7 @@ import io
 import uuid
 import asyncio
 
-from server.server import Server
+from services.server import Server
 from fastapi import FastAPI, Cookie, HTTPException, WebSocket, WebSocketException
 from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
@@ -10,10 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Res
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-server = Server(
-    time_per_prompt=120,
-    diffuser_steps=1
-)
+server = Server(time_per_prompt=60)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,11 +28,10 @@ async def startup_event():
 
 @app.get("/")
 async def read_root():
-    return FileResponse("index.html")
+    return FileResponse("./static/index.html")
 
 @app.get("/init/")
 async def initialize_session(response: Response):
-    print('init called')
     session_id = str(uuid.uuid4())
     response.set_cookie(key="session_id", value=session_id)
     return {"message": "Session initialized", "session_id": session_id}
@@ -45,9 +41,9 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
+            await asyncio.sleep(1)
             time = server.fetch_clock()
             await websocket.send_json({"time": time})
-            await asyncio.sleep(1)
     except WebSocketException:
         print('[INFO] Client disconnected.')
 

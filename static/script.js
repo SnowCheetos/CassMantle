@@ -4,7 +4,7 @@ const ws = new WebSocket("ws://localhost:8000/clock");
 // Function to update the clock
 function updateClock(time) {
     document.getElementById("clock").innerText = time;
-    if (time === "00:00") {
+    if (time == "00:00") {
         fetchImage();
     }
 }
