@@ -1,43 +1,56 @@
-// Create a WebSocket connection
-const ws = new WebSocket("ws://localhost:8000/clock");
+window.onload = function() {
+    if (!document.cookie.includes("session_id")) {
+        fetch("/init")
+        .then(response => response.json())
+        .then(data => {
+            console.log("Session initialized:", data.session_id);
+            initializeWebSocket();  // Initialize WebSocket after the session is set up
+            fetchImage();  // Fetch image after the session is set up
+            submitButton.disabled = false;  // Enable the submit button
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            // Consider enabling the button here as well if you want users to be able to try even if session initialization fails.
+        });
+    } else {
+        console.log("Session already initialized");
+        initializeWebSocket();  // Initialize WebSocket if the session is already set up
+        fetchImage();  // Fetch image if the session is already set up
+        submitButton.disabled = false;  // Enable the submit button
+    }
+};
 
-// Function to update the clock
-function updateClock(time) {
+function initializeWebSocket() {
+    const ws = new WebSocket("ws://localhost:8000/clock");
+
+    ws.addEventListener("message", function(event) {
+        const data = JSON.parse(event.data);
+        const time = data.time;
+        const reset = data.reset;
+        updateClock(time, reset);
+    });
+}
+
+function updateClock(time, reset) {
     document.getElementById("clock").innerText = time;
-    if (time == "00:00") {
+    console.log("TIME RECEIVED: ", time);
+    if (reset === true) {
         fetchImage();
     }
 }
 
-// Listen for messages from the server
-ws.addEventListener("message", function(event) {
-    const data = JSON.parse(event.data);
-    const time = data.time;
-    updateClock(time);
-});
-
-// Initialize session when the page loads
-window.onload = function() {
-    // Check if session_id cookie is already set
-    if (!document.cookie.includes("session_id")) {
-        fetch("/init/")
-        .then(response => response.json())
-        .then(data => {
-            // Session initialized and cookie set by the server
-            console.log("Session initialized:", data.session_id);
-        })
-        .catch(error => console.error("Error:", error));
-    } else {
-        console.log("Session already initialized");
+// Function to update the clock
+function updateClock(time, reset) {
+    document.getElementById("clock").innerText = time;
+    console.log("TIME RECEIVED: ", time)
+    if (reset == true) {
+        fetchImage();
     }
-};
+}
 
 const imageElement = document.getElementById("generated-image");
 const submitButton = document.getElementById("submit-button");
 const userInput = document.getElementById("user-input");
-
-// Fetch initial image
-fetchImage();
 
 // Event listener for the submit button
 submitButton.addEventListener("click", function() {
