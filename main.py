@@ -30,6 +30,21 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 async def startup_event():
     asyncio.create_task(server.global_timer())
 
+@app.get("/init_contents")
+async def init_contents():
+    image = server.fetch_init_image()
+    img_io = io.BytesIO()
+    image.save(img_io, 'JPEG')
+    img_io.seek(0)
+    content = {
+        "image": base64.b64encode(img_io.getvalue()).decode(),
+        "prompt": {
+            'tokens': ['None'],
+            'masks': [0]
+        }
+    }
+    return JSONResponse(content=content)
+
 @app.get("/")
 async def read_root():
     return FileResponse("./static/index.html")

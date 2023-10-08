@@ -7,22 +7,40 @@ fetch('./dict/en_US.aff').then(response => response.text()).then((affData) => {
     });
 });
 
-// document.addEventListener("DOMContentLoaded", () => {
-//     createClockElement();
-//     initializeApp().then(app => {
-//         // Use app to get the session ID and refresh content
-//         createSubmitButton(app); // Pass app to createSubmitButton
-//         app.initializeSession()
-//             .then(() => {
-//                 app.initializeWebSocket();
-//                 app.fetchAndDisplayContents(true);
-//             })
-//             .catch(err => console.error("Error initializing session:", err));
-//     });
-// });
-
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
+    populateInitContent();
+
+    const cookieNotification = document.getElementById("cookie-notification");
+    const acceptButton = document.getElementById("accept-cookies");
+
+    // Check if user has already accepted cookies
+    if (!localStorage.getItem("cookiesAccepted")) {
+        cookieNotification.style.display = "block";
+    } else {
+        initializeAppLogic(); // If cookies were already accepted, run the initialization logic.
+    }
+
+    acceptButton.addEventListener("click", () => {
+        // Hide the notification and save the user's choice
+        cookieNotification.style.display = "none";
+        localStorage.setItem("cookiesAccepted", "true");
+        
+        initializeAppLogic(); // Now run the initialization logic.
+    });
+});
+
+async function populateInitContent() {
+    try {
+        const response = await fetch(`/init_contents/`);
+        const data = await response.json();
+        displayImage(data.image);
+    } catch (err) {
+        console.error("Error fetching contents:", err);
+    }
+}
+
+function initializeAppLogic() {
     initializeApp().then(app => {
         // Use app to get the session ID and refresh content
         createSubmitButton(app); // Pass app to createSubmitButton
@@ -49,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .catch(err => console.error("Error initializing session:", err));
     });
-});
+}
 
 function clearPrompt() {
     const promptContainer = document.getElementById("prompt-container");
@@ -213,7 +231,7 @@ function displayPrompt(promptData) {
     const { tokens, masks } = promptData;
     const promptContainer = document.getElementById("prompt-container");
     
-    // Clear any existing content, but keep the submit button
+    // // Clear any existing content, but keep the submit button
     while (promptContainer.firstChild && promptContainer.firstChild.id !== 'submit-button') {
         promptContainer.firstChild.remove();
     }
@@ -306,6 +324,21 @@ function submitInputs(app) {
 }
 
 function hasTypo(inputValue) {
+    // Regular expression to match any non-alphanumeric characters excluding spaces
+    const symbolsRegex = /[^a-zA-Z0-9\s]/;
+    // Regular expression to match two or more consecutive spaces
+    const consecutiveSpacesRegex = /\s{2,}/;
+
+    if (symbolsRegex.test(inputValue)) {
+        console.log("Symbols detected");
+        return true;
+    }
+
+    if (consecutiveSpacesRegex.test(inputValue)) {
+        console.log("Consecutive spaces detected");
+        return true;
+    }
+
     const words = inputValue.split(/\s+/);
     for (const word of words) {
         if (dictionary && !dictionary.check(word)) {

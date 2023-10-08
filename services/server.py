@@ -67,6 +67,11 @@ class Server(Backend):
         image = self.fetch_current_image()
         masked = self.mask_image(image, float(scores['max']))
         return masked
+    
+    def fetch_init_image(self) -> Image.Image:
+        image = self.fetch_current_image()
+        masked = self.mask_image(image, self.min_score)
+        return masked
 
     def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
         words = self.fetch_masked_words()

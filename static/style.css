@@ -43,6 +43,64 @@ html, body {
     text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.7);
 }
 
+#cookie-banner {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 15px;
+    font-size: 16px;
+    display: none; /* Hidden by default */
+    z-index: 1000;
+}
+
+#cookie-notification {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #686868;
+    color: #fff;
+    text-align: center;
+    padding: 1em;
+    font-size: 14px;
+    font-family: Courier New, monospace;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+    display: none; /* Initially hidden */
+    z-index: 3000; /* Ensures it appears on top */
+}
+
+#accept-cookies {
+    margin-left: 15px;
+    padding: 5px 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: 2px solid white;
+    color: white;
+    border-radius: 5px;
+    padding-left: 20px;
+    padding-right: 20px;
+    font-family: Tahoma, sans-serif;
+}
+
+
+#accept-cookies:hover {
+    /* Hover styles */
+    background-color: #4e4e4e;  /* Darker shade of the initial blue */
+    transform: scale(1.05);  /* Slightly enlarge the button */
+}
+
+#accept-cookies:active {
+    /* Active styles (when the button is pressed) */
+    background-color: #4e4e4e;  /* Even darker shade of blue */
+    transform: scale(1);  /* Reset the size to original when pressed */
+}
+
+a {
+    color: rgb(201, 201, 201);
+}
+
 /* Hide the default scrollbar */
 ::-webkit-scrollbar {
     width: 5px;  /* Width of the vertical scrollbar */
