@@ -106,7 +106,7 @@ class DiffuserService:
             ).images[0]
         else:
             MAX_RETRIES = 3
-            DELAY_BETWEEN_RETRIES = 10
+            DELAY_BETWEEN_RETRIES = 60
 
             for attempt in range(MAX_RETRIES):
                 try:

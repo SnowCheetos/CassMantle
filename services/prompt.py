@@ -149,8 +149,8 @@ class PromptService:
             output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
             prompt = '.'.join(output_text.split('.')[:2]) + '.'
         else:
-            MAX_RETRIES = 5
-            DELAY_BETWEEN_RETRIES = 10
+            MAX_RETRIES = 3
+            DELAY_BETWEEN_RETRIES = 60
 
             for attempt in range(MAX_RETRIES):
                 try:
