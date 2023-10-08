@@ -1,3 +1,12 @@
+let dictionary = null;
+
+fetch('./dict/en_US.aff').then(response => response.text()).then((affData) => {
+    fetch('./dict/en_US.dic').then(response => response.text()).then((dicData) => {
+        dictionary = new Typo("en_US", affData, dicData);
+        console.log("Dictionary Loaded")
+    });
+});
+
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
     initializeApp().then(app => {
@@ -134,7 +143,7 @@ function createSubmitButton(app) {
 
     // Add hover effect
     submitButton.onmouseover = function() {
-        this.style.backgroundColor = "rgba(180, 180, 180, 0.7)"; //"#45a049"; // Darker green
+        this.style.backgroundColor = "rgba(180, 180, 180, 0.7)";
     };
 
     submitButton.onmouseout = function() {
@@ -221,7 +230,6 @@ function submitInputs(app) {
     // If any input has a typo, don't send the data to the server
     if (hasAnyTypos) return;
 
-    // Continue with the data submission process...
     fetch("/compute_score", {
         method: "POST",
         headers: {
@@ -240,6 +248,11 @@ function submitInputs(app) {
 
 
 function hasTypo(inputValue) {
-    // Simple example: Check if the input value contains numbers
-    return /\d/.test(inputValue);
+    const words = inputValue.split(/\s+/);
+    for (const word of words) {
+        if (dictionary && !dictionary.check(word)) {
+            return true;
+        }
+    }
+    return false;
 }
