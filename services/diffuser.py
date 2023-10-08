@@ -2,11 +2,13 @@ import io
 import gc
 import pika
 import redis
+import json
 import torch
 import platform
 
 from PIL import Image
 from diffusers import DiffusionPipeline
+from utils import reconstruct_sentence
 
 class DiffuserService:
     """
@@ -39,12 +41,25 @@ class DiffuserService:
         )
         self.pipeline.to(self.device)
 
-        self.redis_conn = redis.Redis()
-        self.redis_conn.hset('image', 'status', 'idle')
-
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
         self.channel = self.connection.channel(channel_number=73)
         self.channel.queue_declare(queue='diffuser_service')
+
+        self.redis_conn = redis.Redis()
+        self.redis_conn.hset('image', 'status', 'idle')
+
+        self.startup()
+
+    def startup(self) -> None:
+        prompts = self.redis_conn.hget('prompt', 'current')
+        if not prompts: 
+            raise Exception("Prompt not generated yet, startup failed.")
+        prompts = json.loads(prompts)
+        self.redis_conn.hset('image', 'status', 'busy')
+        image = self.generate_image(reconstruct_sentence(prompts['tokens']))
+        encoding = self.encode_image(image)
+        self.redis_conn.hset('image', mapping={'current': encoding, 'status': 'idle'})
+        print("[INFO] Initial image generated.")
 
     def encode_image(self, image: Image.Image) -> bytes:
         image_bytes_io = io.BytesIO()
@@ -54,7 +69,7 @@ class DiffuserService:
 
     def generate_image(self, prompt: str) -> Image.Image:
         return self.pipeline(
-            prompt=f'A painting of {prompt}',
+            prompt=prompt,
             negative_prompt='blurry and bad',
             num_inference_steps=self.diffuser_steps,
             height=self.height,

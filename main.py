@@ -1,5 +1,4 @@
 import io
-import nltk
 import uuid
 import asyncio
 
@@ -11,7 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Res
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-server = Server(time_per_prompt=180)
+server = Server(time_per_prompt=60 * 5)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +24,6 @@ app.mount("/static", StaticFiles(directory="./static/"), name="static")
 
 @app.on_event("startup")
 async def startup_event():
-    nltk.download('averaged_perceptron_tagger')
     asyncio.create_task(server.global_timer())
 
 @app.get("/")

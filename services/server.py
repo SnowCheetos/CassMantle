@@ -1,4 +1,5 @@
 import io
+import json
 import time
 import redis
 import redis.lock
@@ -7,6 +8,7 @@ import asyncio
 from PIL import Image
 from typing import List, Dict
 from services.backend import Backend
+from services.utils import reconstruct_sentence
 
 class Server(Backend):
     """
@@ -16,37 +18,15 @@ class Server(Backend):
     def __init__(
             self, 
             min_score=0.1,
-            prompt_delim='|',
             time_per_prompt=120,
             rabbit_host='localhost'
         ) -> None:
         super().__init__(rabbit_host)
 
         self.min_score = min_score
-        self.prompt_delim = prompt_delim
         self.time_per_prompt = time_per_prompt
         self.redis_conn = redis.Redis(decode_responses=False)
-        self.redis_conn.flushall()
-
-        self.redis_conn.hset(
-            'prompt', mapping={
-                'status': 'idle',
-                'current': 'nice|horse'
-            }
-        )
-        self.redis_conn.hset(
-            'image', mapping={
-                'status': 'idle',
-                'current': self.encode_image(Image.open('media/demo.jpeg'))
-            }
-        )
-    
-    @staticmethod
-    def encode_image(image: Image.Image) -> bytes:
-        image_bytes_io = io.BytesIO()
-        image.save(image_bytes_io, format='JPEG')
-        image_bytes = image_bytes_io.getvalue()
-        return image_bytes
+        # self.redis_conn.flushall()
 
     def init_client(self, session: str) -> None:
         if self.redis_conn.exists(session): self.redis_conn.delete(session)
@@ -54,19 +34,30 @@ class Server(Backend):
         self.redis_conn.hset(session, mapping=contents)
         self.redis_conn.sadd('sessions', session)
 
-    def construct_prompt(self, prompt_list: List[str]) -> str:
-        prefix = 'an' if prompt_list[0][0] in ['a', 'e', 'i', 'o', 'u'] else 'a'
-        return f"{prefix} {' '.join(prompt_list)}"
+    def fetch_next_prompt(self) -> str:
+        prompts = self.redis_conn.hget('prompt', 'next').decode()
+        if not prompts: return
+        prompts = json.loads(prompts)
+        return reconstruct_sentence(prompts['tokens'])
 
-    def fetch_prompt(self) -> str:
-        # TODO Need to implement a better way to do this...
-        prompts = self.redis_conn.hget('prompt', 'current').decode()
-        prompt_list = prompts.split(self.prompt_delim)
-        return self.construct_prompt(prompt_list)
+    def fetch_masked_prompt(self) -> str:
+        prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
+        tokens, masks = prompts['tokens'], prompts['masks']
+        for mask in masks:
+            tokens[mask] = '*'
+        return reconstruct_sentence(tokens)
+
+    def fetch_masked_words(self) -> List[str]:
+        prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
+        tokens, masks = prompts['tokens'], prompts['masks']
+        words = []
+        for mask in masks:
+            words.append(tokens[mask])
+        return words
 
     def fetch_client_scores(self, session: str) -> Dict[str, str]:
         while self.redis_conn.hget(session, 'status').decode() == 'busy':
-            time.sleep(0.25)
+            time.sleep(0.1)
         contents = self.redis_conn.hgetall(session)
         contents = {key.decode(): value.decode() for key, value in contents.items()}
         return contents
@@ -82,9 +73,8 @@ class Server(Backend):
         return masked
 
     def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
-        prompts = self.redis_conn.hget('prompt', 'current').decode()
-        prompt_list = prompts.split(self.prompt_delim)
-        self.compute_scores(session, inputs, prompt_list)
+        words = self.fetch_masked_words()
+        self.compute_scores(session, inputs, words)
         time.sleep(0.1)
         return self.fetch_client_scores(session)
 
@@ -137,10 +127,9 @@ class Server(Backend):
                 self.redis_conn.setex('busy', 5, 1)
                 print("GENERATING IMAGE")
                 image_status = self.redis_conn.hget('image', 'status').decode()
-                next_prompt = self.redis_conn.hget('prompt', 'next').decode()
+                next_prompt = self.fetch_next_prompt()
                 if image_status == 'idle' and next_prompt:
-                    prompt_list = next_prompt.split(self.prompt_delim)
-                    self.generate_image(self.construct_prompt(prompt_list))
+                    self.generate_image(next_prompt)
                 
     async def global_timer(self) -> None:
         # Start the countdown
