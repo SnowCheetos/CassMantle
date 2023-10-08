@@ -120,8 +120,8 @@ function createSubmitButton(app) {
     // Add CSS styles dynamically
     submitButton.style.fontSize = '16';
     submitButton.style.marginLeft = '15px';
-    submitButton.style.marginTop = '2px';
-    submitButton.style.marginBottom = '2px';
+    submitButton.style.marginTop = '3px';
+    submitButton.style.marginBottom = '3px';
     submitButton.style.padding = '4px';
     submitButton.style.paddingLeft = '15px';
     submitButton.style.paddingRight = '15px';
@@ -143,6 +143,12 @@ function createSubmitButton(app) {
 
     // Add click event listener
     submitButton.addEventListener('click', () => submitInputs(app));
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent any default behavior
+            submitButton.click(); // Simulate the button click
+        }
+    });
 }
 
 function displayPrompt(promptData) {
@@ -163,17 +169,18 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "20px";  // Add inline style for font size
-            inputField.style.fontFamily = "Arial, sans-serif";  // Add inline style for font family
-            inputField.style.margin = "1px";
+            inputField.style.fontSize = "20px";
+            inputField.style.fontFamily = "Arial, sans-serif";
+            inputField.style.margin = "3px";
+            inputField.style.transition = 'background 0.3s';
             promptContainer.appendChild(inputField);
         } else {
             // Otherwise, add a span with the token
             const span = document.createElement("span");
-            span.textContent = token + " ";  // Add a space for separation
-            span.style.fontSize = "18px";  // Add inline style for font size
-            span.style.fontFamily = "Courier New, monospace";  // Add inline style for font family
-            span.style.margin = "1px";
+            span.textContent = token + " ";
+            span.style.fontSize = "18px";
+            span.style.fontFamily = "Courier New, monospace";
+            span.style.margin = "3px";
             promptContainer.appendChild(span);
         }
     });
@@ -185,17 +192,36 @@ function displayPrompt(promptData) {
     }
 }
 
+function flashRed(input) {
+    input.style.background = 'red';
+    setTimeout(() => {
+        input.style.background = 'black';
+    }, 150);
+}
+
 function submitInputs(app) {
-    // Logic for gathering user inputs and sending them to the server
     const inputs = [];
     const promptContainer = document.getElementById("prompt-container");
     
     // Get all input fields
     const inputFields = promptContainer.querySelectorAll("input");
+    
+    let hasAnyTypos = false;
+    
     inputFields.forEach(input => {
-        inputs.push(input.value);
+        if (hasTypo(input.value)) {
+            // Flash the input red if it has a typo
+            flashRed(input);
+            hasAnyTypos = true;
+        } else {
+            inputs.push(input.value);
+        }
     });
 
+    // If any input has a typo, don't send the data to the server
+    if (hasAnyTypos) return;
+
+    // Continue with the data submission process...
     fetch("/compute_score", {
         method: "POST",
         headers: {
@@ -210,4 +236,10 @@ function submitInputs(app) {
     .catch(error => {
         console.error("Error submitting data:", error);
     });
+}
+
+
+function hasTypo(inputValue) {
+    // Simple example: Check if the input value contains numbers
+    return /\d/.test(inputValue);
 }

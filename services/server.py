@@ -17,7 +17,7 @@ class Server(Backend):
     """
     def __init__(
             self, 
-            min_score=0.3,
+            min_score=0.1,
             time_per_prompt=10 * 60, # 10 minutes
             rabbit_host='localhost'
         ) -> None:

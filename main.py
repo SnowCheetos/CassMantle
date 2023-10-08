@@ -42,6 +42,7 @@ async def initialize_session(response: Response):
 @app.websocket("/clock")
 async def connect_clock(websocket: WebSocket):
     await websocket.accept()
+    print('[INFO] Client Connected.')
     try:
         while True:
             await asyncio.sleep(1)
@@ -50,10 +51,10 @@ async def connect_clock(websocket: WebSocket):
             await websocket.send_json({"time": time, "reset": reset})
     
     except WebSocketException:
-        print('[INFO] Client disconnected.')
+        print('[INFO] Client Disconnected.')
     
     except ConnectionClosedOK:
-        print('[INFO] Client disconnected.')
+        print('[INFO] Client Disconnected.')
 
 @app.get("/fetch/contents")
 async def fetch_contents(session_id: str=Cookie(None)):
