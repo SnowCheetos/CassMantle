@@ -24,6 +24,7 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
 app.mount("/dict", StaticFiles(directory="dict"), name="dict")
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 @app.on_event("startup")
 async def startup_event():
@@ -56,6 +57,16 @@ async def connect_clock(websocket: WebSocket):
     
     except ConnectionClosedOK:
         print('[INFO] Client Disconnected.')
+
+@app.get("/client/status")
+async def check_status(session_id: str=Cookie(None)):
+    if not server.redis_conn.exists(session_id): 
+        server.init_client(session_id)
+        return JSONResponse(content={'hasWon': 0})
+    scores = server.fetch_client_scores(session_id)
+    if float(scores['max']) > 0.99:
+        return JSONResponse(content={'hasWon': 1})
+    return JSONResponse(content={'hasWon': 0})
 
 @app.get("/fetch/contents")
 async def fetch_contents(session_id: str=Cookie(None)):

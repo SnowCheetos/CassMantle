@@ -7,19 +7,56 @@ fetch('./dict/en_US.aff').then(response => response.text()).then((affData) => {
     });
 });
 
+// document.addEventListener("DOMContentLoaded", () => {
+//     createClockElement();
+//     initializeApp().then(app => {
+//         // Use app to get the session ID and refresh content
+//         createSubmitButton(app); // Pass app to createSubmitButton
+//         app.initializeSession()
+//             .then(() => {
+//                 app.initializeWebSocket();
+//                 app.fetchAndDisplayContents(true);
+//             })
+//             .catch(err => console.error("Error initializing session:", err));
+//     });
+// });
+
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
     initializeApp().then(app => {
         // Use app to get the session ID and refresh content
         createSubmitButton(app); // Pass app to createSubmitButton
-        app.initializeSession()
-            .then(() => {
-                app.initializeWebSocket();
-                app.fetchAndDisplayContents(true);
+
+        app.initializeSession().then(() => {
+            app.initializeWebSocket();
+
+            // Check the client's status after initializing the session
+            fetch("/client/status", {
+                method: "GET",
+                credentials: 'include', // to ensure cookies are sent with the request
             })
-            .catch(err => console.error("Error initializing session:", err));
+            .then(response => response.json())
+            .then(data => {
+                if (data.hasWon === 1) {
+                    app.fetchAndDisplayContents(false);
+                } else {
+                    app.fetchAndDisplayContents(true);
+                }
+            })
+            .catch(error => {
+                console.error("Error checking client status:", error);
+            });
+        })
+        .catch(err => console.error("Error initializing session:", err));
     });
 });
+
+function clearPrompt() {
+    const promptContainer = document.getElementById("prompt-container");
+    while (promptContainer.firstChild) {
+        promptContainer.firstChild.remove();
+    }
+}
 
 function initializeApp() {
     let sessionId;
@@ -52,6 +89,7 @@ function initializeApp() {
             updateClock(data.time);
 
             if (data.reset) {
+                clearPrompt();
                 fetchAndDisplayContents(true);
             }
         });
@@ -256,7 +294,7 @@ function submitInputs(app) {
     })
     .then(response => response.json())
     .then(data => {
-        if (parseInt(data.max) === 1) {
+        if (parseFloat(data.max) > 0.99) {
             app.fetchAndDisplayContents(false);
         } else {
             app.fetchAndDisplayContents(true);

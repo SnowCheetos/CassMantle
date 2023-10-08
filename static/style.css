@@ -45,13 +45,13 @@ html, body {
 
 /* Hide the default scrollbar */
 ::-webkit-scrollbar {
-    width: 10px;  /* Width of the vertical scrollbar */
+    width: 5px;  /* Width of the vertical scrollbar */
 }
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
     background: #888;  /* Color of the draggable scrolling handle */
-    border-radius: 5px;
+    border-radius: 2px;
 }
 
 /* Handle on hover */
@@ -61,6 +61,6 @@ html, body {
 
 /* Track */
 ::-webkit-scrollbar-track {
-    background: hsla(0, 0%, 39%, 0.3);  /* Color of the track (background behind the handle) */
-    border-radius: 5px;
+    background: hsla(0, 0%, 8%, 0.8);  /* Color of the track (background behind the handle) */
+    /* border-radius: 5px; */
 }
