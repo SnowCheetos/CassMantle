@@ -43,6 +43,15 @@ html, body {
     text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.7);
 }
 
+#IMENTLE {
+    position: fixed;
+    z-index: 3000;
+    top: -30px;
+    left: 30px;
+    font-size: 42px;
+    text-shadow: 2px 2px 3px rgba(221, 221, 221, 0.7);
+}
+
 #cookie-banner {
     position: fixed;
     bottom: 0;
@@ -83,7 +92,6 @@ html, body {
     padding-right: 20px;
     font-family: Tahoma, sans-serif;
 }
-
 
 #accept-cookies:hover {
     /* Hover styles */

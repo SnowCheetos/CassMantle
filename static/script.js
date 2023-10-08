@@ -58,6 +58,7 @@ function initializeAppLogic() {
                 if (data.hasWon === 1) {
                     app.fetchAndDisplayContents(false);
                 } else {
+                    createSubmitButton(app);
                     app.fetchAndDisplayContents(true);
                 }
             })
