@@ -1,6 +1,7 @@
 import io
 import gc
 import random
+import time
 import pika
 import redis
 import json
@@ -54,8 +55,9 @@ class DiffuserService:
             self.pipeline = None
 
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
-        self.channel = self.connection.channel(channel_number=73)
+        self.channel = self.connection.channel()
         self.channel.queue_declare(queue='diffuser_service')
+        self.channel.queue_purge(queue='diffuser_service')
 
         self.redis_conn = redis.Redis()
         self.redis_conn.hset('image', 'status', 'idle')
@@ -103,18 +105,28 @@ class DiffuserService:
                 width=self.width
             ).images[0]
         else:
-            try:
-                response = requests.post(
-                    self.API_URL, 
-                    headers={
-                        "Authorization": f"Bearer {self.API_TOKEN}"
-                    }, 
-                    json={"inputs": full_prompt}
-                )
-                response.raise_for_status()
+            MAX_RETRIES = 3
+            DELAY_BETWEEN_RETRIES = 10
 
-            except requests.exceptions.HTTPError:
-                raise Exception("[ERROR] Unable To Connect To Hugging Face API.")
+            for attempt in range(MAX_RETRIES):
+                try:
+                    response = requests.post(
+                        self.API_URL, 
+                        headers={
+                            "Authorization": f"Bearer {self.API_TOKEN}"
+                        }, 
+                        json={"inputs": full_prompt}
+                    )
+                    response.raise_for_status()
+                    return Image.open(io.BytesIO(response.content))
+
+                except requests.exceptions.HTTPError as e:
+                    # If the error is a 503 and it's not the last attempt, wait and retry
+                    if response.status_code == 503 and attempt < MAX_RETRIES - 1:
+                        print(f"[WARNING] Received 503 response. Retrying in {DELAY_BETWEEN_RETRIES} seconds...")
+                        time.sleep(DELAY_BETWEEN_RETRIES)
+                    else:
+                        raise Exception("[ERROR] Unable To Connect To Hugging Face API.") from e
             
             return Image.open(io.BytesIO(response.content))
     

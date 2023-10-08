@@ -23,7 +23,7 @@ class PromptService:
             self, 
             top_n=20,
             min_score=0.1,
-            num_masked=2,
+            num_masked=3,
             gensim_model='glove-twitter-100', #'word2vec-google-news-300',
             language_model='facebook/bart-large-cnn',
             rabbit_host='localhost'
@@ -51,8 +51,9 @@ class PromptService:
         self.tokenizer = AutoTokenizer.from_pretrained(language_model)
 
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_host, heartbeat=600))
-        self.channel = self.connection.channel(channel_number=72)
+        self.channel = self.connection.channel()
         self.channel.queue_declare(queue='prompt_service')
+        self.channel.queue_purge(queue='prompt_service')
 
         self.redis_conn = redis.Redis(decode_responses=True)
         self.redis_conn.flushall()
@@ -67,7 +68,7 @@ class PromptService:
         print("[INFO] Initial prompt generated.")
 
     def compute_score(self, inputs: str, answer: str) -> float:
-        score = self.word2vec.similarity(inputs, answer)
+        score = self.word2vec.similarity(inputs.lower(), answer.lower())
         return max(self.min_score, score)
     
     def most_similar(self, word: str) -> List[str]:
@@ -112,10 +113,16 @@ class PromptService:
     def generate_prompt(self) -> Dict[str, Union[List[str], List[int]]]:
         input_text = self.starters[random.randint(0, len(self.starters)-1)]
         input_ids = self.tokenizer.encode(input_text, return_tensors='pt')
-        output_ids = self.model.generate(input_ids, max_length=64, num_beams=11, do_sample=True, temperature=1.25)
+        output_ids = self.model.generate(    
+            input_ids, 
+            max_length=64, 
+            num_beams=11, 
+            do_sample=True, 
+            temperature=2.0,
+            top_p=0.8
+        )
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        prompt = output_text.split('.')[0]
-        print(prompt)
+        prompt = '.'.join(output_text.split('.')[:2]) + '.'
         masks = self.select_descriptive_words(input_text, prompt, self.num_masked)
         return {
             'tokens': word_tokenize(prompt),

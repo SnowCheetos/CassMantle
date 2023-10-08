@@ -15,7 +15,7 @@ class Backend:
 
     def generate_image(self, prompt: str) -> None:
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
-        image_channel = connection.channel(channel_number=73)
+        image_channel = connection.channel()
         image_channel.queue_declare(queue='diffuser_service')
         image_channel.basic_publish(
             exchange='',
@@ -26,7 +26,7 @@ class Backend:
 
     def compute_scores(self, session: str, inputs: List[str], answer: List[str]) -> None:
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
-        prompt_channel = connection.channel(channel_number=72)
+        prompt_channel = connection.channel()
         prompt_channel.queue_declare(queue='prompt_service')
         contents = {
             'operation': 0,
@@ -45,7 +45,7 @@ class Backend:
 
     def generate_prompt(self) -> None:
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
-        prompt_channel = connection.channel(channel_number=72)
+        prompt_channel = connection.channel()
         prompt_channel.queue_declare(queue='prompt_service')
         contents = {
             'operation': 1, 

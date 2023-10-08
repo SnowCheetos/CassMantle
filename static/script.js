@@ -58,7 +58,6 @@ function initializeAppLogic() {
                 if (data.hasWon === 1) {
                     app.fetchAndDisplayContents(false);
                 } else {
-                    createSubmitButton(app);
                     app.fetchAndDisplayContents(true);
                 }
             })
@@ -179,35 +178,39 @@ function createClockElement() {
     clockDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
     clockDiv.style.padding = '10px 20px';
     clockDiv.style.borderRadius = '15px';
-    clockDiv.style.boxShadow = '0px 0px 15px 5px rgba(255, 255, 255, 0.9)';
+    clockDiv.style.boxShadow = '0px 0px 15px 5px rgba(255, 255, 255, 0.5)';
 }
 
 function createSubmitButton(app) {
     // Get the prompt container
-    const promptContainer = document.getElementById('prompt-container');
+    //const promptContainer = document.getElementById('prompt-container');
+
+    const appContainer = document.getElementById('app');
 
     // Create the submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'submit-button';
     submitButton.textContent = 'SUBMIT';
 
-    // Append the submit button to the prompt container
-    promptContainer.appendChild(submitButton);
+    // Append the submit button to the document body (or to a specific container if needed)
+    document.body.appendChild(submitButton);
 
-    // Add CSS styles dynamically
-    submitButton.style.fontSize = '16';
-    submitButton.style.marginLeft = '15px';
-    submitButton.style.marginTop = '3px';
-    submitButton.style.marginBottom = '3px';
+    submitButton.style.position = 'fixed'; // This makes the button stick to the bottom
+    submitButton.style.bottom = '10px';    // 10px from the bottom of the page
+    submitButton.style.left = '50%';       // Center the button
+    submitButton.style.transform = 'translateX(-50%)'; // Ensure it's centered
+    submitButton.style.fontSize = '16px';
     submitButton.style.padding = '4px';
-    submitButton.style.paddingLeft = '15px';
-    submitButton.style.paddingRight = '15px';
-    submitButton.style.backgroundColor = 'transparent'; // Green
-    submitButton.style.color = 'white';
+    submitButton.style.paddingLeft = '25px';
+    submitButton.style.marginBottom = '10px';
+    submitButton.style.paddingRight = '25px';
+    submitButton.style.backgroundColor = 'transparent';
+    submitButton.style.color = "white";
     submitButton.style.border = '2px solid white';
     submitButton.style.borderRadius = '20px';
     submitButton.style.cursor = 'pointer';
     submitButton.style.fontFamily = "Tahoma, sans-serif";
+    submitButton.style.textShadow = "2px 2px 3px rgba(0, 0, 0, 0.7)";
 
     // Add hover effect
     submitButton.onmouseover = function() {
@@ -215,7 +218,7 @@ function createSubmitButton(app) {
     };
 
     submitButton.onmouseout = function() {
-        this.style.backgroundColor = "transparent"; // Green
+        this.style.backgroundColor = "transparent";
     };
 
     // Add click event listener
@@ -226,12 +229,15 @@ function createSubmitButton(app) {
             submitButton.click();
         }
     });
+
+    appContainer.appendChild(submitButton);
 }
+
 
 function displayPrompt(promptData) {
     const { tokens, masks } = promptData;
     const promptContainer = document.getElementById("prompt-container");
-    
+    promptContainer.style.paddingBottom = '40px';
     // // Clear any existing content, but keep the submit button
     while (promptContainer.firstChild && promptContainer.firstChild.id !== 'submit-button') {
         promptContainer.firstChild.remove();
@@ -246,7 +252,7 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "20px";
+            inputField.style.fontSize = "16px";
             inputField.style.fontFamily = "Arial, sans-serif";
             inputField.style.margin = "3px";
             inputField.style.transition = 'background 0.3s';
@@ -255,9 +261,9 @@ function displayPrompt(promptData) {
             // Otherwise, add a span with the token
             const span = document.createElement("span");
             span.textContent = token + " ";
-            span.style.fontSize = "18px";
+            span.style.fontSize = "16px";
             span.style.fontFamily = "Courier New, monospace";
-            span.style.margin = "3px";
+            // span.style.margin = "3px";
             promptContainer.appendChild(span);
         }
     });
@@ -267,7 +273,7 @@ function displayPrompt(promptData) {
     if (submitButton) {
         if (masks.length > 0) {
             // If there are masks, ensure the button is attached and visible
-            promptContainer.appendChild(submitButton);
+            submitButton.style.display = 'block';
         } else {
             // Otherwise, hide the button
             submitButton.style.display = 'none';
@@ -325,9 +331,15 @@ function submitInputs(app) {
 }
 
 function hasTypo(inputValue) {
-    // Regular expression to match any non-alphanumeric characters excluding spaces
+    if (inputValue === ' ' || inputValue === '') {
+        return true;
+    }
+
+    if (/\s/.test(inputValue)) {
+        return true;
+    }    
+
     const symbolsRegex = /[^a-zA-Z0-9\s]/;
-    // Regular expression to match two or more consecutive spaces
     const consecutiveSpacesRegex = /\s{2,}/;
 
     if (symbolsRegex.test(inputValue)) {

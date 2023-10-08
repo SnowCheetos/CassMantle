@@ -5,6 +5,7 @@ html, body {
     flex-direction: column;
 }
 
+
 #app {
     flex: 1;
     display: flex;
@@ -36,21 +37,23 @@ html, body {
     position: fixed;
     bottom: 0;
     width: 100%;
+    height: auto;
+    max-height: 50%;
     text-align: center;
-    padding: 3vw;
-    background: linear-gradient(to top, rgb(123, 89, 53, 0.9), transparent); /* change color to red for testing */
+    padding: 5vw;
+    background: linear-gradient(to top, rgb(123, 89, 53, 0.9), transparent);
     color: white;
     text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.7);
 }
 
-#IMENTLE {
+/* #IMENTLE {
     position: fixed;
     z-index: 3000;
     top: -30px;
     left: 30px;
     font-size: 42px;
     text-shadow: 2px 2px 3px rgba(221, 221, 221, 0.7);
-}
+} */
 
 #cookie-banner {
     position: fixed;
