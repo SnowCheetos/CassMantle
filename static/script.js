@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
         app.initializeSession()
             .then(() => {
                 app.initializeWebSocket();
-                app.fetchAndDisplayContents();
+                app.fetchAndDisplayContents(true);
             })
             .catch(err => console.error("Error initializing session:", err));
     });
@@ -52,17 +52,24 @@ function initializeApp() {
             updateClock(data.time);
 
             if (data.reset) {
-                fetchAndDisplayContents();
+                fetchAndDisplayContents(true);
             }
         });
     }
 
-    async function fetchAndDisplayContents() {
+    async function fetchAndDisplayContents(prompt) {
         try {
             const response = await fetch(`/fetch/contents?session_id=${sessionId}`);
             const data = await response.json();
             displayImage(data.image);
-            displayPrompt(data.prompt);
+            if (prompt === true) {
+                displayPrompt(data.prompt);
+            } else {
+                displayPrompt({
+                    tokens: ['Congratulations, you got it!', 'Good luck next round.'],
+                    masks: [],
+                });
+            }
         } catch (err) {
             console.error("Error fetching contents:", err);
         }
@@ -112,6 +119,10 @@ function createClockElement() {
     clockDiv.style.fontSize = '2em';
     clockDiv.style.textAlign = 'center';
     clockDiv.style.textShadow = '2px 2px 4px rgba(255, 255, 255, 0.5)';
+    clockDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
+    clockDiv.style.padding = '10px 20px';
+    clockDiv.style.borderRadius = '15px';
+    clockDiv.style.boxShadow = '0px 0px 15px 5px rgba(255, 255, 255, 0.9)';
 }
 
 function createSubmitButton(app) {
@@ -154,8 +165,8 @@ function createSubmitButton(app) {
     submitButton.addEventListener('click', () => submitInputs(app));
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Enter') {
-            event.preventDefault(); // Prevent any default behavior
-            submitButton.click(); // Simulate the button click
+            event.preventDefault();
+            submitButton.click();
         }
     });
 }
@@ -197,7 +208,13 @@ function displayPrompt(promptData) {
     // Ensure the submit button is appended last
     const submitButton = document.getElementById('submit-button');
     if (submitButton) {
-        promptContainer.appendChild(submitButton);
+        if (masks.length > 0) {
+            // If there are masks, ensure the button is attached and visible
+            promptContainer.appendChild(submitButton);
+        } else {
+            // Otherwise, hide the button
+            submitButton.style.display = 'none';
+        }
     }
 }
 
@@ -239,13 +256,16 @@ function submitInputs(app) {
     })
     .then(response => response.json())
     .then(data => {
-        app.fetchAndDisplayContents();
+        if (parseInt(data.max) === 1) {
+            app.fetchAndDisplayContents(false);
+        } else {
+            app.fetchAndDisplayContents(true);
+        }
     })
     .catch(error => {
         console.error("Error submitting data:", error);
     });
 }
-
 
 function hasTypo(inputValue) {
     const words = inputValue.split(/\s+/);

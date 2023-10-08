@@ -89,6 +89,7 @@ async def compute_score(request: Request, session_id: str = Cookie(None)):
 
     if session_id is not None:
         scores = server.compute_client_scores(session_id, inputs)
+        print(scores)
         return JSONResponse(scores)
     else:
         raise HTTPException(status_code=400, detail='No session id')

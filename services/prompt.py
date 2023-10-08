@@ -112,7 +112,7 @@ class PromptService:
     def generate_prompt(self) -> Dict[str, Union[List[str], List[int]]]:
         input_text = self.starters[random.randint(0, len(self.starters)-1)]
         input_ids = self.tokenizer.encode(input_text, return_tensors='pt')
-        output_ids = self.model.generate(input_ids, max_length=64, num_beams=11, do_sample=True, temperature=1.2)
+        output_ids = self.model.generate(input_ids, max_length=64, num_beams=11, do_sample=True, temperature=1.25)
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         prompt = output_text.split('.')[0]
         print(prompt)
