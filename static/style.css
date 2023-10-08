@@ -1,0 +1,135 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+
+#app {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-size: cover;
+    background-position: center;
+}
+
+.image-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.responsive-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#overlay-content {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: auto;
+    max-height: 50%;
+    text-align: center;
+    padding: 5vw;
+    background: linear-gradient(to top, rgb(123, 89, 53, 0.9), transparent);
+    color: white;
+    text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* #IMENTLE {
+    position: fixed;
+    z-index: 3000;
+    top: -30px;
+    left: 30px;
+    font-size: 42px;
+    text-shadow: 2px 2px 3px rgba(221, 221, 221, 0.7);
+} */
+
+#cookie-banner {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    padding: 15px;
+    font-size: 16px;
+    display: none; /* Hidden by default */
+    z-index: 1000;
+}
+
+#cookie-notification {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #686868;
+    color: #fff;
+    text-align: center;
+    padding: 1em;
+    font-size: 14px;
+    font-family: Courier New, monospace;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+    display: none; /* Initially hidden */
+    z-index: 3000; /* Ensures it appears on top */
+}
+
+#accept-cookies {
+    margin-left: 15px;
+    padding: 5px 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: 2px solid white;
+    color: white;
+    border-radius: 5px;
+    padding-left: 20px;
+    padding-right: 20px;
+    font-family: Tahoma, sans-serif;
+}
+
+#accept-cookies:hover {
+    /* Hover styles */
+    background-color: #4e4e4e;  /* Darker shade of the initial blue */
+    transform: scale(1.05);  /* Slightly enlarge the button */
+}
+
+#accept-cookies:active {
+    /* Active styles (when the button is pressed) */
+    background-color: #4e4e4e;  /* Even darker shade of blue */
+    transform: scale(1);  /* Reset the size to original when pressed */
+}
+
+a {
+    color: rgb(201, 201, 201);
+}
+
+/* Hide the default scrollbar */
+::-webkit-scrollbar {
+    width: 5px;  /* Width of the vertical scrollbar */
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+    background: #888;  /* Color of the draggable scrolling handle */
+    border-radius: 2px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+    background: #555;  /* Darken the handle color when hovering */
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+    background: hsla(0, 0%, 8%, 0.8);  /* Color of the track (background behind the handle) */
+    /* border-radius: 5px; */
+}
