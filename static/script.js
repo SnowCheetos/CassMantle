@@ -1,11 +1,22 @@
 let dictionary = null;
+let dictionaryReady = false;
 
 fetch('./dict/en_US.aff').then(response => response.text()).then((affData) => {
     fetch('./dict/en_US.dic').then(response => response.text()).then((dicData) => {
         dictionary = new Typo("en_US", affData, dicData);
-        console.log("Dictionary Loaded")
+        console.log("Dictionary Loaded");
+        dictionaryReady = true;
+
+        if (document.readyState === "complete" && dictionaryReady) {
+            hideLoadingPage();
+        }
     });
 });
+
+function hideLoadingPage() {
+    const loadingContainer = document.querySelector(".loading-container");
+    loadingContainer.style.display = "none";
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
@@ -26,8 +37,11 @@ document.addEventListener("DOMContentLoaded", () => {
         cookieNotification.style.display = "none";
         localStorage.setItem("cookiesAccepted", "true");
         
-        initializeAppLogic(); // Now run the initialization logic.
+        initializeAppLogic();
     });
+    if (document.readyState === "complete" && dictionaryReady) {
+        hideLoadingPage();
+    }
 });
 
 async function populateInitContent() {
@@ -67,6 +81,7 @@ function initializeAppLogic() {
         })
         .catch(err => console.error("Error initializing session:", err));
     });
+    hideLoadingPage();
 }
 
 function clearPrompt() {
@@ -256,6 +271,7 @@ function displayPrompt(promptData) {
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
             inputField.style.fontSize = "16px";
+            inputField.style.textAlign = 'center';
             inputField.style.fontFamily = "Arial, sans-serif";
             inputField.style.margin = "3px";
             inputField.style.transition = 'background 0.3s';

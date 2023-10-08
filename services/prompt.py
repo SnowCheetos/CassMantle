@@ -157,7 +157,7 @@ class PromptService:
             output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
             prompt = '.'.join(output_text.split('.')[:2]) + '.'
         else:
-            MAX_RETRIES = 3
+            MAX_RETRIES = 5
             DELAY_BETWEEN_RETRIES = 10
 
             for attempt in range(MAX_RETRIES):
@@ -208,7 +208,8 @@ class PromptService:
         elif operation == 1: # Generate prompt
             self.redis_conn.hset('prompt', 'status', 'busy')
             prompt = self.generate_prompt()
-            while len(prompt['masks']) == 0 or '?' in ''.join(prompt['tokens']):
+            while len(prompt['masks']) == 0:
+                time.sleep(10)
                 prompt = self.generate_prompt()
             self.redis_conn.hset('prompt', mapping={'next': json.dumps(prompt), 'status': 'idle'})
 

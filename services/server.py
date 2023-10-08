@@ -18,7 +18,7 @@ class Server(Backend):
     def __init__(
             self, 
             min_score=0.1,
-            time_per_prompt=15 * 60, # 15 minutes
+            time_per_prompt=20 * 60, # 20 minutes
             rabbit_host='localhost'
         ) -> None:
         super().__init__(rabbit_host)
@@ -139,7 +139,7 @@ class Server(Backend):
             remaining_time = self.fetch_countdown()
 
             # Check if time to generate new prompt
-            if int(remaining_time) == int(self.time_per_prompt * 0.7):
+            if int(remaining_time) == int(self.time_per_prompt * 0.8):
                 self.locked_generate_prompt()
 
             if int(remaining_time) == int(self.time_per_prompt * 0.4):
