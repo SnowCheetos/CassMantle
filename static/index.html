@@ -1,32 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Image Guessing Game</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./static/style.css">
 </head>
 <body>
-  <h1>Guess the Prompt!</h1>
-
-  <div id="image-container">
-    <img id="generated-image" src="" alt="Generated Image">
-  </div>
-
-  <!-- Create an element with id "clock" to display the clock -->
-    <div id="clock">00:00</div>
-
-
-  <div id="input-container">
-    <div class="input-wrapper">
-        <input type="text" id="user-input1" placeholder="Your first guess here">
-        <span class="score-overlay" id="score1">Score: 0</span>
+    <div id="app">
+        <!-- <input class="redacted" type="text" placeholder="REDACTED"> -->
+        <img id="generated-image" src="" alt="Generated content" class="responsive-image">
+        <div id="overlay-content">
+          <div id="prompt-container"></div>
     </div>
-    <div class="input-wrapper">
-        <input type="text" id="user-input2" placeholder="Your second guess here">
-        <span class="score-overlay" id="score2">Score: 0</span>
-    </div>
-    <button id="submit-button">Submit</button>
-  </div>
-
-  <script src="/static/script.js"></script>
-
+    <link href='https://fonts.googleapis.com/css?family=Orbitron' rel='stylesheet' type='text/css'>
+    <script src="./static/script.js"></script>
 </body>
 </html>

@@ -1,9 +1,11 @@
 import io
 import gc
+import random
 import pika
 import redis
 import json
 import torch
+import requests
 import platform
 
 from PIL import Image
@@ -17,29 +19,39 @@ class DiffuserService:
     """
     def __init__(
             self,
-            image_size=(512, 512),
+            local=False, # Whether or not to use the API
+            image_size=(448, 448),
             diffuser_steps=50,
             diffuser_model='stabilityai/stable-diffusion-2-1', 
             # diffuser_model='stabilityai/stable-diffusion-xl-base-1.0',
+            API_URL="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
             rabbit_host='localhost'
         ) -> None:
         
+        self.local = local
         self.height, self.width = image_size
         self.diffuser_steps = diffuser_steps
-        
-        self.cuda_available = torch.cuda.is_available()
+        self.API_URL = API_URL
 
+        self.cuda_available = torch.cuda.is_available()
         if platform.system() == "Darwin": self.device = 'mps' if torch.backends.mps.is_available() else 'cpu'
         else: self.device = 'cuda' if self.cuda_available else 'cpu'
 
         self.dtype = torch.float16 if self.cuda_available else torch.float32
         
-        self.pipeline = DiffusionPipeline.from_pretrained(
-            diffuser_model, 
-            torch_dtype=self.dtype, 
-            use_safetensors=True
-        )
-        self.pipeline.to(self.device)
+        if self.local:
+            print("[INFO] Loading local model into memory")
+            self.pipeline = DiffusionPipeline.from_pretrained(
+                diffuser_model, 
+                torch_dtype=self.dtype, 
+                use_safetensors=True
+            )
+            self.pipeline.to(self.device)
+        else:
+            print("[INFO] Using Hugging Face API")
+            with open('api_key.txt', 'r') as f:
+                self.API_TOKEN = f.readline()
+            self.pipeline = None
 
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
         self.channel = self.connection.channel(channel_number=73)
@@ -47,6 +59,18 @@ class DiffuserService:
 
         self.redis_conn = redis.Redis()
         self.redis_conn.hset('image', 'status', 'idle')
+
+        self.styles = [
+            '. Impressionism',
+            '. Line Art',
+            '. Surrealism',
+            '. Pop Art',
+            '. Romanticism',
+            '. Realism',
+            '. Baroque',
+            '. Gothic',
+            '. Fauvism'
+        ]
 
         self.startup()
 
@@ -68,13 +92,31 @@ class DiffuserService:
         return image_bytes
 
     def generate_image(self, prompt: str) -> Image.Image:
-        return self.pipeline(
-            prompt=prompt,
-            negative_prompt='blurry and bad',
-            num_inference_steps=self.diffuser_steps,
-            height=self.height,
-            width=self.width
-        ).images[0]
+        full_prompt = prompt + self.styles[random.randint(0, len(self.styles)-1)] + ' style.'
+        print(f'[INFO] Full Prompt: {full_prompt}')
+        if self.local:
+            return self.pipeline(
+                prompt=full_prompt,
+                negative_prompt='blurry, distorted, fake, abstract',
+                num_inference_steps=self.diffuser_steps,
+                height=self.height,
+                width=self.width
+            ).images[0]
+        else:
+            try:
+                response = requests.post(
+                    self.API_URL, 
+                    headers={
+                        "Authorization": f"Bearer {self.API_TOKEN}"
+                    }, 
+                    json={"inputs": full_prompt}
+                )
+                response.raise_for_status()
+
+            except requests.exceptions.HTTPError:
+                raise Exception("[ERROR] Unable To Connect To Hugging Face API.")
+            
+            return Image.open(io.BytesIO(response.content))
     
     def callback(self, ch, method, properties, body):
         self.redis_conn.hset('image', 'status', 'busy')

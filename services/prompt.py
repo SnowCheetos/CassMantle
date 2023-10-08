@@ -103,11 +103,8 @@ class PromptService:
             and pos not in ['NNP', 'NNPS']  # Exclude proper nouns
             and word not in skips
         ]
-        
-        # Select words
+
         selected_words = random.sample(filtered_words, min(num_words, len(filtered_words)))
-        
-        # Find indices
         indices = [words.index(word) for word in selected_words]
         
         return indices
@@ -143,8 +140,10 @@ class PromptService:
 
         elif operation == 1: # Generate prompt
             self.redis_conn.hset('prompt', 'status', 'busy')
-            prompt = json.dumps(self.generate_prompt())
-            self.redis_conn.hset('prompt', mapping={'next': prompt, 'status': 'idle'})
+            prompt = self.generate_prompt()
+            while len(prompt['masks']) == 0:
+                prompt = self.generate_prompt()
+            self.redis_conn.hset('prompt', mapping={'next': json.dumps(prompt), 'status': 'idle'})
 
         else:
             print('[ERROR] Invalid operation tag received')

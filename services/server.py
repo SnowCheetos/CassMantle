@@ -8,7 +8,7 @@ import asyncio
 from PIL import Image
 from typing import List, Dict
 from services.backend import Backend
-from services.utils import reconstruct_sentence
+from services.utils import format_seconds_to_time, reconstruct_sentence
 
 class Server(Backend):
     """
@@ -17,8 +17,8 @@ class Server(Backend):
     """
     def __init__(
             self, 
-            min_score=0.1,
-            time_per_prompt=120,
+            min_score=0.3,
+            time_per_prompt=10 * 60, # 10 minutes
             rabbit_host='localhost'
         ) -> None:
         super().__init__(rabbit_host)
@@ -26,7 +26,6 @@ class Server(Backend):
         self.min_score = min_score
         self.time_per_prompt = time_per_prompt
         self.redis_conn = redis.Redis(decode_responses=False)
-        # self.redis_conn.flushall()
 
     def init_client(self, session: str) -> None:
         if self.redis_conn.exists(session): self.redis_conn.delete(session)
@@ -40,18 +39,15 @@ class Server(Backend):
         prompts = json.loads(prompts)
         return reconstruct_sentence(prompts['tokens'])
 
-    def fetch_masked_prompt(self) -> str:
+    def fetch_prompt_json(self) -> str:
         prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
-        tokens, masks = prompts['tokens'], prompts['masks']
-        for mask in masks:
-            tokens[mask] = '*'
-        return reconstruct_sentence(tokens)
+        return prompts
 
     def fetch_masked_words(self) -> List[str]:
         prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
         tokens, masks = prompts['tokens'], prompts['masks']
         words = []
-        for mask in masks:
+        for mask in sorted(masks):
             words.append(tokens[mask])
         return words
 
@@ -94,11 +90,6 @@ class Server(Backend):
             self.redis_conn.hset(session, mapping=contents)
 
         return True
-    
-    @staticmethod
-    def format_seconds_to_time(seconds: int) -> str:
-        minutes, remaining_seconds = divmod(seconds, 60)
-        return f"{minutes:02d}:{remaining_seconds:02d}"
 
     def start_countdown(self) -> None:
         self.redis_conn.setex('countdown', self.time_per_prompt, 'active')
@@ -108,7 +99,7 @@ class Server(Backend):
 
     def fetch_clock(self) -> str:
         seconds = int(self.fetch_countdown())
-        return self.format_seconds_to_time(seconds)
+        return format_seconds_to_time(seconds)
 
     def reset_clock(self) -> None:
         self.start_countdown()
@@ -148,7 +139,7 @@ class Server(Backend):
                 self.locked_generate_image()
 
             # Check if time's up
-            if remaining_time <= 1:
+            if remaining_time <= 0.5:
                 with self.redis_conn.lock("update_lock", timeout=1):
                     self.redis_conn.setex("reset", 1, 1)
                     if self.update_contents():

@@ -1,8 +1,7 @@
 import pika
 import json
-import numpy as np
 
-from PIL import Image
+from PIL import Image, ImageFilter
 from typing import List
 
 class Backend:
@@ -59,15 +58,9 @@ class Backend:
         )
         connection.close()
 
-    def compute_mask_ratio(self, score: float) -> float:
-        return 1 - score ** 2
+    def score_to_blur(self, score: float, min_blur: float=0.0, max_blur: float=100):
+        return min_blur + (1 - score) * (max_blur - min_blur)
 
     def mask_image(self, image: Image.Image, score: float) -> Image.Image:
-        image = np.array(image)
-        height, width, _ = image.shape
-        total_elements = width * height
-        num_mask_elements = int(self.compute_mask_ratio(score) * total_elements)
-        idx = np.random.choice(total_elements, num_mask_elements, replace=False)
-        row_indices, col_indices = np.divmod(idx, width)
-        image[row_indices, col_indices] = [255, 255, 255]
-        return Image.fromarray(np.uint8(image))
+        blur = self.score_to_blur(score)
+        return image.filter(ImageFilter.GaussianBlur(blur))

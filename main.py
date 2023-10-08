@@ -1,3 +1,4 @@
+import base64
 import io
 import uuid
 import asyncio
@@ -6,11 +7,12 @@ from services.server import Server
 from fastapi import FastAPI, Cookie, HTTPException, WebSocket, WebSocketException
 from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from websockets.exceptions import ConnectionClosedOK
 
 app = FastAPI()
-server = Server(time_per_prompt=60 * 5)
+server = Server()
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,14 +34,13 @@ async def read_root():
 
 @app.get("/init")
 async def initialize_session(response: Response):
-    print("INIT CALLED")
     session_id = str(uuid.uuid4())
     response.set_cookie(key="session_id", value=session_id)
     server.init_client(session_id)
     return {"message": "Session initialized", "session_id": session_id}
 
 @app.websocket("/clock")
-async def websocket_endpoint(websocket: WebSocket):
+async def connect_clock(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
@@ -47,27 +48,42 @@ async def websocket_endpoint(websocket: WebSocket):
             time = server.fetch_clock()
             reset = bool(server.redis_conn.exists('reset'))
             await websocket.send_json({"time": time, "reset": reset})
+    
     except WebSocketException:
         print('[INFO] Client disconnected.')
+    
+    except ConnectionClosedOK:
+        print('[INFO] Client disconnected.')
 
-@app.get("/fetch_image")
-async def fetch_image(session_id: str = Cookie(None)):
-    if not server.redis_conn.exists(session_id):
-        server.init_client(session_id)
-
+@app.get("/fetch/contents")
+async def fetch_contents(session_id: str=Cookie(None)):
+    """
+    Response: {
+        "image": JPEG Bytes,
+        "prompt" {
+            "tokens": List[str],
+            "masks": List[int]
+        }
+    }
+    """
+    if not server.redis_conn.exists(session_id): server.init_client(session_id)
     image = server.fetch_masked_image(session_id)
     img_io = io.BytesIO()
     image.save(img_io, 'JPEG')
     img_io.seek(0)
-    return StreamingResponse(img_io, headers={"Content-Type": "image/jpeg"})
+    prompt = server.fetch_prompt_json()
+    content = {
+        "image": base64.b64encode(img_io.getvalue()).decode(),
+        "prompt": prompt
+    }
+    return JSONResponse(content=content)
 
 @app.post("/compute_score")
 async def compute_score(request: Request, session_id: str = Cookie(None)):
-    if not server.redis_conn.exists(session_id):
-        server.init_client(session_id)
+    if not server.redis_conn.exists(session_id): server.init_client(session_id)
 
     data = await request.json()
-    inputs = list(data.values())
+    inputs = list(data['inputs'])
 
     if session_id is not None:
         scores = server.compute_client_scores(session_id, inputs)
