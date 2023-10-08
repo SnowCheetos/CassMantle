@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
-app.mount("/dict", StaticFiles(directory="dict"), name="dict")
+app.mount("/data", StaticFiles(directory="data"), name="data")
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 @app.on_event("startup")

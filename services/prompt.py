@@ -27,7 +27,7 @@ class PromptService:
             local=False,
             top_n=20,
             min_score=0.1,
-            num_masked=2,
+            num_masked=3,
             gensim_model='glove-twitter-100', #'word2vec-google-news-300',
             language_model='facebook/bart-large-cnn',
             rabbit_host='localhost'
@@ -35,18 +35,10 @@ class PromptService:
 
         self.local = local
 
-        self.starters = [
-            "A surreal scene featuring",
-            "An abstract representation of",
-            "A detailed illustration of",
-            "A fantastical image where",
-            "A tranquil and peaceful scene with",
-            "An eerie and mysterious depiction of",
-            "A vibrant and colorful tableau involving",
-            "A heartwarming moment where",
-            "A dynamic and energetic artwork of",
-            "An enigmatic visual of"
-        ]
+        self.seed = []
+        with open("data/seeds.txt", "r") as f:
+            for line in f.readlines():
+                self.seed.append(line)
 
         self.top_n = top_n
         self.min_score = min_score
@@ -143,7 +135,7 @@ class PromptService:
         return indices
 
     def generate_prompt(self) -> Dict[str, Union[List[str], List[int]]]:
-        input_text = self.starters[random.randint(0, len(self.starters)-1)]
+        input_text = self.seed[random.randint(0, len(self.seed)-1)]
         if self.local:
             input_ids = self.tokenizer.encode(input_text, return_tensors='pt')
             output_ids = self.model.generate(    

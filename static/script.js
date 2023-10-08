@@ -1,8 +1,8 @@
 let dictionary = null;
 let dictionaryReady = false;
 
-fetch('./dict/en_US.aff').then(response => response.text()).then((affData) => {
-    fetch('./dict/en_US.dic').then(response => response.text()).then((dicData) => {
+fetch('./data/en_US.aff').then(response => response.text()).then((affData) => {
+    fetch('./data/en_US.dic').then(response => response.text()).then((dicData) => {
         dictionary = new Typo("en_US", affData, dicData);
         console.log("Dictionary Loaded");
         dictionaryReady = true;
