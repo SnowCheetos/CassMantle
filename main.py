@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
+app.mount("/dict", StaticFiles(directory="dict"), name="dict")
 
 @app.on_event("startup")
 async def startup_event():
