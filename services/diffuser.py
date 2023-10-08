@@ -115,7 +115,10 @@ class DiffuserService:
                         headers={
                             "Authorization": f"Bearer {self.API_TOKEN}"
                         }, 
-                        json={"inputs": full_prompt}
+                        json={
+                            "inputs": full_prompt,
+                            "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative'}
+                        }
                     )
                     response.raise_for_status()
                     return Image.open(io.BytesIO(response.content))

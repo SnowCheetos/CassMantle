@@ -104,7 +104,6 @@ async def fetch_contents(session_id: str=Cookie(None)):
         "image": base64.b64encode(img_io.getvalue()).decode(),
         "prompt": prompt
     }
-    print(prompt)
     return JSONResponse(content=content)
 
 @app.post("/compute_score")

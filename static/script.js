@@ -247,6 +247,9 @@ function displayPrompt(promptData) {
         if (masks.includes(index)) {
             // If the index is in masks, add an input field
             const inputField = document.createElement("input");
+            const span = document.createElement("span");
+            span.textContent = " ";
+            promptContainer.appendChild(span);
             inputField.type = "text";
             inputField.id = `input-${index}`;
             inputField.style.border = 'none';
@@ -260,7 +263,11 @@ function displayPrompt(promptData) {
         } else {
             // Otherwise, add a span with the token
             const span = document.createElement("span");
-            span.textContent = token + " ";
+            if ((token === ".") || (token === ",")) {
+                span.textContent = token;
+            } else {
+                span.textContent = " " + token;
+            }
             span.style.fontSize = "16px";
             span.style.fontFamily = "Courier New, monospace";
             // span.style.margin = "3px";

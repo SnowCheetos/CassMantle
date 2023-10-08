@@ -2,8 +2,10 @@ import gc
 import pika
 import json
 import redis
+import time
 import random
 import string
+import requests
 import gensim.downloader
 
 import nltk
@@ -22,13 +24,16 @@ class PromptService:
     """
     def __init__(
             self, 
+            local=False,
             top_n=20,
             min_score=0.1,
-            num_masked=3,
+            num_masked=2,
             gensim_model='glove-twitter-100', #'word2vec-google-news-300',
             language_model='facebook/bart-large-cnn',
             rabbit_host='localhost'
         ) -> None:
+
+        self.local = local
 
         self.starters = [
             "A surreal scene featuring",
@@ -49,8 +54,17 @@ class PromptService:
         self.freq_dist = nltk.FreqDist(w.lower() for w in brown.words())
 
         self.word2vec = gensim.downloader.load(gensim_model)
-        self.model = BartForConditionalGeneration.from_pretrained(language_model)
-        self.tokenizer = AutoTokenizer.from_pretrained(language_model)
+        
+        if self.local:
+            print("[INFO] Loading local model into memory")
+            self.model = BartForConditionalGeneration.from_pretrained(language_model)
+            self.tokenizer = AutoTokenizer.from_pretrained(language_model)
+        else:
+            self.API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+            print("[INFO] Using Hugging Face API")
+            with open('api_key.txt', 'r') as f:
+                self.API_TOKEN = f.readline()
+            self.model, self.tokenizer = None, None
 
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbit_host, heartbeat=600))
         self.channel = self.connection.channel()
@@ -130,17 +144,45 @@ class PromptService:
 
     def generate_prompt(self) -> Dict[str, Union[List[str], List[int]]]:
         input_text = self.starters[random.randint(0, len(self.starters)-1)]
-        input_ids = self.tokenizer.encode(input_text, return_tensors='pt')
-        output_ids = self.model.generate(    
-            input_ids, 
-            max_length=64, 
-            num_beams=11, 
-            do_sample=True, 
-            temperature=2.0,
-            top_p=0.82
-        )
-        output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        prompt = '.'.join(output_text.split('.')[:2]) + '.'
+        if self.local:
+            input_ids = self.tokenizer.encode(input_text, return_tensors='pt')
+            output_ids = self.model.generate(    
+                input_ids, 
+                max_length=64, 
+                num_beams=11, 
+                do_sample=True, 
+                temperature=2.0,
+                top_p=0.85
+            )
+            output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+            prompt = '.'.join(output_text.split('.')[:2]) + '.'
+        else:
+            MAX_RETRIES = 3
+            DELAY_BETWEEN_RETRIES = 10
+
+            for attempt in range(MAX_RETRIES):
+                try:
+                    response = requests.post(
+                        self.API_URL, 
+                        headers={
+                            "Authorization": f"Bearer {self.API_TOKEN}"
+                        }, 
+                        json={
+                            "inputs": input_text,
+                            "parameters": {"max_new_tokens": 64}
+                        }
+                    )
+                    response.raise_for_status()
+                    prompt = '.'.join(response.json()[0].get('generated_text').split('.')[:2]) + '.'
+
+                except requests.exceptions.HTTPError as e:
+                    # If the error is a 503 and it's not the last attempt, wait and retry
+                    if response.status_code == 503 and attempt < MAX_RETRIES - 1:
+                        print(f"[WARNING] Received 503 response. Retrying in {DELAY_BETWEEN_RETRIES} seconds...")
+                        time.sleep(DELAY_BETWEEN_RETRIES)
+                    else:
+                        raise Exception("[ERROR] Unable To Connect To Hugging Face API.") from e
+
         masks = self.select_descriptive_words(input_text, prompt, self.num_masked)
         return {
             'tokens': word_tokenize(prompt),
