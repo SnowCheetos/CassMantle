@@ -41,6 +41,8 @@ class Server(Backend):
 
     def fetch_prompt_json(self) -> str:
         prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
+        for mask in sorted(prompts['masks']):
+            prompts['tokens'][mask] = '*'
         return prompts
 
     def fetch_masked_words(self) -> List[str]:

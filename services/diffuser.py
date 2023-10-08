@@ -63,15 +63,15 @@ class DiffuserService:
         self.redis_conn.hset('image', 'status', 'idle')
 
         self.styles = [
-            '. Impressionism',
-            '. Line Art',
-            '. Surrealism',
-            '. Pop Art',
-            '. Romanticism',
-            '. Realism',
-            '. Baroque',
-            '. Gothic',
-            '. Fauvism'
+            'Impressionism',
+            'Line Art',
+            'Surrealism',
+            'Pop Art',
+            'Romanticism',
+            'Realism',
+            'Baroque',
+            'Gothic',
+            'Fauvism'
         ]
 
         self.startup()
@@ -94,12 +94,12 @@ class DiffuserService:
         return image_bytes
 
     def generate_image(self, prompt: str) -> Image.Image:
-        full_prompt = prompt + self.styles[random.randint(0, len(self.styles)-1)] + ' style.'
+        full_prompt = " ".join((prompt, self.styles[random.randint(0, len(self.styles)-1)], 'style.'))
         print(f'[INFO] Full Prompt: {full_prompt}')
         if self.local:
             return self.pipeline(
                 prompt=full_prompt,
-                negative_prompt='blurry, distorted, fake, abstract',
+                negative_prompt='blurry, distorted, fake, abstract, negative',
                 num_inference_steps=self.diffuser_steps,
                 height=self.height,
                 width=self.width

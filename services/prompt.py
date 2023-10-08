@@ -7,10 +7,11 @@ import string
 import gensim.downloader
 
 import nltk
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, brown
 from nltk.tokenize import word_tokenize
 
 from typing import List, Dict, Union
+from utils import weighted_sample_without_replacement
 from transformers import AutoTokenizer, BartForConditionalGeneration
 
 class PromptService:
@@ -45,6 +46,7 @@ class PromptService:
         self.top_n = top_n
         self.min_score = min_score
         self.num_masked = num_masked
+        self.freq_dist = nltk.FreqDist(w.lower() for w in brown.words())
 
         self.word2vec = gensim.downloader.load(gensim_model)
         self.model = BartForConditionalGeneration.from_pretrained(language_model)
@@ -84,6 +86,16 @@ class PromptService:
         if not max_score: self.redis_conn.hset(session, 'max', score)
         elif score > max_score: self.redis_conn.hset(session, 'max', score)
 
+    def word_complexity(self, word: str) -> int:
+        # Use a large number to ensure that less frequent words get higher values
+        LARGE_NUM = 1e6
+
+        # The less frequent the word, the higher the complexity score from the freq_dist
+        freq_score = LARGE_NUM - self.freq_dist[word.lower()]
+
+        # Combine the frequency score and the word length
+        return freq_score + len(word)
+
     def select_descriptive_words(self, inputs: str, prompt: str, num_words: int=2) -> List[str]:
         # Load stop words
         stop_words = set(stopwords.words('english'))
@@ -105,9 +117,15 @@ class PromptService:
             and word not in skips
         ]
 
-        selected_words = random.sample(filtered_words, min(num_words, len(filtered_words)))
+        word_scores = {word: self.word_complexity(word) for word in filtered_words}
+
+        selected_words = weighted_sample_without_replacement(
+            list(word_scores.keys()),
+            list(word_scores.values()),
+            min(num_words, len(filtered_words))
+        )
+
         indices = [words.index(word) for word in selected_words]
-        
         return indices
 
     def generate_prompt(self) -> Dict[str, Union[List[str], List[int]]]:
@@ -119,7 +137,7 @@ class PromptService:
             num_beams=11, 
             do_sample=True, 
             temperature=2.0,
-            top_p=0.8
+            top_p=0.82
         )
         output_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         prompt = '.'.join(output_text.split('.')[:2]) + '.'
@@ -148,7 +166,7 @@ class PromptService:
         elif operation == 1: # Generate prompt
             self.redis_conn.hset('prompt', 'status', 'busy')
             prompt = self.generate_prompt()
-            while len(prompt['masks']) == 0:
+            while len(prompt['masks']) == 0 or '?' in ''.join(prompt['tokens']):
                 prompt = self.generate_prompt()
             self.redis_conn.hset('prompt', mapping={'next': json.dumps(prompt), 'status': 'idle'})
 
@@ -169,6 +187,7 @@ class PromptService:
 
 
 if __name__ == '__main__':
+    nltk.download('brown')
     nltk.download('punkt')
     nltk.download('stopwords')
     nltk.download('averaged_perceptron_tagger')

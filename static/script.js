@@ -100,7 +100,7 @@ function initializeApp() {
     }    
 
     function initializeWebSocket() {
-        const ws = new WebSocket("ws://localhost:8000/clock");
+        const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + "/clock");
 
         ws.addEventListener("message", event => {
             const data = JSON.parse(event.data);
@@ -294,7 +294,14 @@ function submitInputs(app) {
     
     // Get all input fields
     const inputFields = promptContainer.querySelectorAll("input");
-    
+    inputFields.forEach(input => {
+        input.addEventListener('input', function() {
+            if (!isNaN(parseFloat(this.value))) {
+                this.value = '';
+            }
+        });
+    });
+
     let hasAnyTypos = false;
     
     inputFields.forEach(input => {
