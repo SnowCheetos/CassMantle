@@ -184,7 +184,7 @@ function createClockElement() {
     // Add CSS styles dynamically
     clockDiv.style.fontFamily = 'Orbitron, sans-serif';
     clockDiv.style.position = 'fixed';
-    clockDiv.style.top = '10px';
+    clockDiv.style.top = '30px';
     clockDiv.style.left = '50%';
     clockDiv.style.transform = 'translateX(-50%)';
     clockDiv.style.fontSize = '2em';

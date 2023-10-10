@@ -3,6 +3,7 @@ import pika
 import json
 import redis
 import time
+import httpx
 import random
 import string
 import requests

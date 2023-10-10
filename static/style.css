@@ -33,6 +33,14 @@ html, body {
     object-fit: cover;
 }
 
+.logo-image {
+    position: fixed;
+    left: 20px;
+    top: 10px;
+    width: 100px;
+    height: auto;
+}
+
 #overlay-content {
     position: fixed;
     bottom: 0;

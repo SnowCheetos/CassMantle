@@ -10,3 +10,4 @@ safetensors
 diffusers
 pillow
 nltk
+httpx
