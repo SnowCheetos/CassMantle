@@ -46,7 +46,7 @@ class PromptService:
         self.num_masked = num_masked
         self.freq_dist = nltk.FreqDist(w.lower() for w in brown.words())
 
-        self.word2vec = gensim.downloader.load(gensim_model)
+        # self.word2vec = gensim.downloader.load(gensim_model)
         
         if self.local:
             print("[INFO] Loading local model into memory")
@@ -76,22 +76,22 @@ class PromptService:
         self.redis_conn.hset('prompt', mapping={'current': prompt, 'status': 'idle'})
         print("[INFO] Initial prompt generated.")
 
-    def compute_score(self, inputs: str, answer: str) -> float:
-        score = self.word2vec.similarity(inputs.lower(), answer.lower())
-        return max(self.min_score, score)
+    # def compute_score(self, inputs: str, answer: str) -> float:
+    #     score = self.word2vec.similarity(inputs.lower(), answer.lower())
+    #     return max(self.min_score, score)
     
-    def most_similar(self, word: str) -> List[str]:
-        return self.word2vec.most_similar(word, topn=self.top_n)
+    # def most_similar(self, word: str) -> List[str]:
+    #     return self.word2vec.most_similar(word, topn=self.top_n)
     
-    def set_index_score(self, session: str, index: int, score: float) -> None:
-        field = f'score{index+1}'
-        self.redis_conn.hset(session, field, float(score))
+    # def set_index_score(self, session: str, index: int, score: float) -> None:
+    #     field = f'score{index+1}'
+    #     self.redis_conn.hset(session, field, float(score))
 
-    def set_client_score(self, session: str, score: float) -> None:
-        self.redis_conn.hset(session, 'current', score)
-        max_score = float(self.redis_conn.hget(session, 'max'))
-        if not max_score: self.redis_conn.hset(session, 'max', score)
-        elif score > max_score: self.redis_conn.hset(session, 'max', score)
+    # def set_client_score(self, session: str, score: float) -> None:
+    #     self.redis_conn.hset(session, 'current', score)
+    #     max_score = float(self.redis_conn.hget(session, 'max'))
+    #     if not max_score: self.redis_conn.hset(session, 'max', score)
+    #     elif score > max_score: self.redis_conn.hset(session, 'max', score)
 
     def word_complexity(self, word: str) -> int:
         # Use a large number to ensure that less frequent words get higher values

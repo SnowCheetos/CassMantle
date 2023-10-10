@@ -4,6 +4,7 @@ import time
 import redis
 import redis.lock
 import asyncio
+import requests
 
 from PIL import Image
 from typing import List, Dict
@@ -53,6 +54,38 @@ class Server(Backend):
             words.append(tokens[mask])
         return words
 
+
+
+    def compute_scores(self, inputs: str, answer: str) -> float:
+        payload = {'inputs': inputs, 'answer': answer}
+        response = requests.post('http://localhost:9000/compute_scores', json=payload)
+        if response.ok:
+            return response.json()
+        raise Exception("Unable to connect to scoring service.")
+
+    def set_index_score(self, session: str, index: int, score: float) -> None:
+        field = f'score{index+1}'
+        self.redis_conn.hset(session, field, float(score))
+
+    def set_client_score(self, session: str, score: float) -> None:
+        self.redis_conn.hset(session, 'current', score)
+        max_score = float(self.redis_conn.hget(session, 'max'))
+        if not max_score: self.redis_conn.hset(session, 'max', score)
+        elif score > max_score: self.redis_conn.hset(session, 'max', score)
+
+
+    def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
+        words = self.fetch_masked_words()
+        scores = self.compute_scores(inputs, words).get("scores")
+        results = {}
+        for i, score in enumerate(scores):
+            self.set_index_score(session, i, float(score))
+            results.update({f'score{i}': score})
+        mean_score = sum([float(s) for s in scores]) / len(scores)
+        self.set_client_score(session, mean_score)
+        return results
+
+
     def fetch_client_scores(self, session: str) -> Dict[str, str]:
         while self.redis_conn.hget(session, 'status').decode() == 'busy':
             time.sleep(0.1)
@@ -74,12 +107,6 @@ class Server(Backend):
         image = self.fetch_current_image()
         masked = self.mask_image(image, self.min_score)
         return masked
-
-    def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
-        words = self.fetch_masked_words()
-        self.compute_scores(session, inputs, words)
-        time.sleep(0.1)
-        return self.fetch_client_scores(session)
 
     def update_contents(self) -> bool:
         image = self.redis_conn.hget('image', 'next')

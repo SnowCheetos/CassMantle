@@ -24,24 +24,24 @@ class Backend:
         )
         connection.close()
 
-    def compute_scores(self, session: str, inputs: List[str], answer: List[str]) -> None:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
-        prompt_channel = connection.channel()
-        prompt_channel.queue_declare(queue='prompt_service')
-        contents = {
-            'operation': 0,
-            'data': {
-                'session': session,
-                'inputs': inputs,
-                'answer': answer
-            }
-        }
-        prompt_channel.basic_publish(
-            exchange='',
-            routing_key='prompt_service',
-            body=json.dumps(contents)
-        )
-        connection.close()
+    # def compute_scores(self, session: str, inputs: List[str], answer: List[str]) -> None:
+    #     connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
+    #     prompt_channel = connection.channel()
+    #     prompt_channel.queue_declare(queue='prompt_service')
+    #     contents = {
+    #         'operation': 0,
+    #         'data': {
+    #             'session': session,
+    #             'inputs': inputs,
+    #             'answer': answer
+    #         }
+    #     }
+    #     prompt_channel.basic_publish(
+    #         exchange='',
+    #         routing_key='prompt_service',
+    #         body=json.dumps(contents)
+    #     )
+    #     connection.close()
 
     def generate_prompt(self) -> None:
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
