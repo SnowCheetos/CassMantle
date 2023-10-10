@@ -16,7 +16,7 @@ class Server(Backend):
     def __init__(
             self, 
             min_score=0.1,
-            time_per_prompt=5 * 60, # 10 minutes
+            time_per_prompt=10 * 60, # 10 minutes
             max_retries=5,
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
             llm_url="https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
@@ -28,82 +28,92 @@ class Server(Backend):
 
     async def init_client(self, session: str) -> None:
         if await self.redis_conn.exists(session): await self.redis_conn.delete(session)
-        contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
-        await self.redis_conn.hset(session, mapping=contents)
+        await self.reset_client(session)
         await self.redis_conn.sadd('sessions', session)
 
-    async def fetch_next_prompt(self) -> str:
-        prompts = await self.redis_conn.hget('prompt', 'next')
-        assert prompts is not None, "[ERROR] No next prompt available"
+    async def reset_client(self, session: str) -> None:
+        prompt = await self.fetch_current_prompt()
+        contents = {'max': self.min_score, 'won': 0}
+        for m in prompt['masks']: contents.update({str(m): self.min_score})
+        await self.redis_conn.hset(session, mapping=contents)
 
-        prompts = json.loads(prompts.decode())
-        return reconstruct_sentence(prompts['tokens'])
+    async def fetch_current_image(self) -> Image.Image:
+        image_bytes = await self.redis_conn.hget('image', 'current')
+        assert image_bytes is not None, "[ERROR] No current image available"
+        return Image.open(io.BytesIO(image_bytes))
 
-    async def fetch_prompt_json(self) -> str:
-        prompts = await self.redis_conn.hget('prompt', 'next')
+    async def fetch_current_prompt(self) -> Dict[str, List[str]]:
+        prompts = await self.redis_conn.hget('prompt', 'current')
         assert prompts is not None, "[ERROR] No current prompt available"
+        return json.loads(prompts.decode())
 
-        prompts = json.loads(prompts.decode())
-        for mask in sorted(prompts['masks']): prompts['tokens'][mask] = '*'
-        return prompts
+    async def fetch_init_image(self) -> Image.Image:
+        image = await self.fetch_current_image()
+        masked = self.mask_image(image, self.min_score)
+        return masked
 
-    async def fetch_masked_words(self) -> List[str]:
-        prompts = await self.redis_conn.hget('prompt', 'next')
-        assert prompts is not None, "[ERROR] No next prompt available"
+    async def compute_client_scores(self, session: str, inputs: Dict[str, str]) -> Dict[str, str]:
+        prompt = await self.fetch_current_prompt()
+        pairs = {}
+        for m in inputs.keys():
+            pairs.update({
+                m: {
+                    "input": inputs[m],
+                    "answer": prompt['tokens'][int(m)]
+                }
+            })
+        scores = await self.compute_scores(pairs)
+        scores = await self.set_client_scores(session, scores)
+    
+        return scores
 
-        prompts = json.loads(prompts.decode())
-        tokens, masks = prompts['tokens'], prompts['masks']
-        words = []
-        for mask in sorted(masks): words.append(tokens[mask])
-        return words
+    async def set_client_scores(self, session: str, scores: Dict[str, str]) -> Dict[str, str]:
+        curr_scores = await self.fetch_client_scores(session)
+        mean_score = sum([float(s) for s in scores.values()]) / len(scores)
+        if float(mean_score) > float(curr_scores['max']):
+            await self.redis_conn.hset(session, 'max', mean_score)
 
-    async def set_index_score(self, session: str, index: int, score: float) -> None:
-        field = f'score{index+1}'
-        await self.redis_conn.hset(session, field, float(score))
-
-    async def set_client_score(self, session: str, score: float) -> None:
-        await self.redis_conn.hset(session, 'current', score)
-        max_score = float(await self.redis_conn.hget(session, 'max'))
-        if not max_score: await self.redis_conn.hset(session, 'max', score)
-        elif score > max_score: await self.redis_conn.hset(session, 'max', score)
-
-    async def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
-        words = await self.fetch_masked_words()
-        scores = (await self.compute_scores(inputs, words)).get("scores")
-        results = {}
-        for i, score in enumerate(scores):
-            await self.set_index_score(session, i, float(score))
-            results.update({f'score{i}': score})
-        mean_score = sum([float(s) for s in scores]) / len(scores)
-        await self.set_client_score(session, mean_score)
-        return results
+        for key in scores.keys():
+            if float(scores[key]) > float(curr_scores[key]):
+                await self.redis_conn.hset(session, key, scores[key])
+        
+        await self.redis_conn.hset(session, 'won', int(mean_score == 1))
+        scores.update({'won': int(mean_score == 1)})
+        return scores
 
     async def fetch_client_scores(self, session: str) -> Dict[str, str]:
-        while (await self.redis_conn.hget(session, 'status')).decode() == 'busy':
-            time.sleep(0.1)
         contents = await self.redis_conn.hgetall(session)
         contents = {key.decode(): value.decode() for key, value in contents.items()}
         return contents
-    
-    async def fetch_current_image(self) -> Image.Image:
-        image_bytes = await self.redis_conn.hget('image', 'current')
-        return Image.open(io.BytesIO(image_bytes))
+
+    async def fetch_prompt_json(self, session_id: str) -> str:
+        prompt = await self.fetch_current_prompt()
+        scores = await self.fetch_client_scores(session_id)
+
+        if (await self.redis_conn.hget(session_id, 'won')).decode() == "1":
+            prompt['masks'] = []
+        else:
+            for i, mask in enumerate(sorted(prompt['masks'])): 
+                score = scores.get(str(mask))
+                if score:
+                    if float(score) > 0.99:  
+                        prompt['masks'][i] = -1
+                    else:
+                        prompt['tokens'][mask] = '*'
+                else:
+                    prompt['tokens'][mask] = '*'
+
+        return prompt
 
     async def fetch_masked_image(self, session: str) -> Image.Image:
         scores = await self.fetch_client_scores(session)
         image = await self.fetch_current_image()
         masked = self.mask_image(image, float(scores['max']))
         return masked
-    
-    async def fetch_init_image(self) -> Image.Image:
-        image = await self.fetch_current_image()
-        masked = self.mask_image(image, self.min_score)
-        return masked
 
     async def reset_sessions(self) -> None:
         sessions = await self.redis_conn.smembers('sessions')
-        contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
-        for session in sessions: await self.redis_conn.hset(session, mapping=contents)
+        for session in sessions: await self.reset_client(session)
 
     async def start_countdown(self) -> None:
         await self.redis_conn.setex('countdown', self.time_per_prompt, 'active')

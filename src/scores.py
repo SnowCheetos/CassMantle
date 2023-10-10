@@ -29,16 +29,16 @@ service = ScoreService()
 @app.post("/compute_scores")
 async def compute_scores(request: Request) -> JSONResponse:
     data = await request.json()
-    scores = []
-    for inp, ans in zip(data['inputs'], data['answer']):
-        scores.append(str(service.compute_score(inp, ans)))
-    return JSONResponse(content={'scores': scores})
+    scores = {}
+    for key in data.keys():
+        score = service.compute_score(data[key]['input'], data[key]['answer'])
+        scores.update({key: str(score)})
+    return JSONResponse(scores)
 
 @app.post("/most_similar")
 async def most_similar(request: Request) -> JSONResponse:
     data = await request.json()
     sims = service.most_similar(data['input'], int(data['topn']))
-    print(sims)
     return JSONResponse(content={'results': sims})
 
 if __name__ == '__main__':

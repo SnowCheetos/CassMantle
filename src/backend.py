@@ -1,6 +1,7 @@
 import io
-import asyncio
 import json
+import asyncio
+import random
 import aioredis
 
 from PIL import Image, ImageFilter
@@ -20,11 +21,19 @@ class Backend:
         ) -> None:
         
         with open('api_key.txt', 'r') as f: API_TOKEN = f.readline()
+        
+        self.seeds = []
+        with open('data/seeds.txt') as f:
+            for line in f.readlines():
+                self.seeds.append(line)
 
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
         self.auth_header = {"Authorization": f"Bearer {API_TOKEN}"}
+
+    async def select_seed(self) -> str:
+        return self.seeds[random.randint(0, len(self.seeds) - 1)]
 
     async def initialize_redis(self) -> aioredis.Redis:
         return await aioredis.Redis(host='localhost', decode_responses=False)
@@ -35,7 +44,7 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
         await self.redis_conn.hset('image', 'status', 'idle')
 
-        seed = "An enigmatic visual of"
+        seed = await self.select_seed()
         async with self.redis_conn.lock("startup_lock", timeout=60):
             if (
                 await self.redis_conn.hget('prompt', 'current') is None
@@ -66,7 +75,7 @@ class Backend:
         await self.redis_conn.hset('image', 'next', image)
 
     async def buffer_contents(self) -> None:
-        seed = 'A whimsical portrayal of'
+        seed = await self.select_seed()
         async with self.redis_conn.lock("buffer_lock", timeout=60):
             if (
                 await self.redis_conn.hget('prompt', 'next') is None
@@ -153,12 +162,12 @@ class Backend:
             print("[ERROR] Image generation failed.")
             return None
         
-    async def compute_scores(self, inputs: str, answer: str) -> Dict[str, List[str]]:
+    async def compute_scores(self, pairs: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
         response = await api_call(
             method="POST",
             url='http://localhost:9000/compute_scores',
             # headers=self.auth_header,
-            json={'inputs': inputs, 'answer': answer},
+            json=pairs,
             timeout=3,
             retry_on_status_codes={503},
         )

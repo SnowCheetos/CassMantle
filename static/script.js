@@ -69,7 +69,7 @@ function initializeAppLogic() {
             })
             .then(response => response.json())
             .then(data => {
-                if (data.hasWon === 1) {
+                if (data.won === 1) {
                     app.fetchAndDisplayContents(false);
                 } else {
                     app.fetchAndDisplayContents(true);
@@ -266,7 +266,7 @@ function displayPrompt(promptData) {
             span.textContent = " ";
             promptContainer.appendChild(span);
             inputField.type = "text";
-            inputField.id = `input-${index}`;
+            inputField.id = `${index}`;
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
@@ -312,7 +312,7 @@ function flashRed(input) {
 }
 
 function submitInputs(app) {
-    const inputs = [];
+    const inputs = {};
     const promptContainer = document.getElementById("prompt-container");
     
     // Get all input fields
@@ -333,7 +333,8 @@ function submitInputs(app) {
             flashRed(input);
             hasAnyTypos = true;
         } else {
-            inputs.push(input.value);
+            // inputs.push(input.value);
+            inputs[input.id] = input.value;
         }
     });
 
@@ -349,7 +350,7 @@ function submitInputs(app) {
     })
     .then(response => response.json())
     .then(data => {
-        if (parseFloat(data.max) > 0.99) {
+        if (parseInt(data.won) === 1) {
             app.fetchAndDisplayContents(false);
         } else {
             app.fetchAndDisplayContents(true);

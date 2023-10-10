@@ -78,29 +78,19 @@ async def connect_clock(websocket: WebSocket):
 async def check_status(session_id: str=Cookie(None)):
     if not await server.redis_conn.exists(session_id): 
         await server.init_client(session_id)
-        return JSONResponse(content={'hasWon': 0})
+        return JSONResponse(content={'won': 0})
     scores = await server.fetch_client_scores(session_id)
-    if float(scores['max']) > 0.99:
-        return JSONResponse(content={'hasWon': 1})
-    return JSONResponse(content={'hasWon': 0})
+    f = {'won': int(scores['won'])}
+    return JSONResponse(content=f)
 
 @app.get("/fetch/contents")
 async def fetch_contents(session_id: str=Cookie(None)):
-    """
-    Response: {
-        "image": JPEG Bytes,
-        "prompt" {
-            "tokens": List[str],
-            "masks": List[int]
-        }
-    }
-    """
     if not await server.redis_conn.exists(session_id): await server.init_client(session_id)
     image = await server.fetch_masked_image(session_id)
     img_io = io.BytesIO()
     image.save(img_io, 'JPEG')
     img_io.seek(0)
-    prompt = await server.fetch_prompt_json()
+    prompt = await server.fetch_prompt_json(session_id)
     content = {
         "image": base64.b64encode(img_io.getvalue()).decode(),
         "prompt": prompt
@@ -112,10 +102,8 @@ async def compute_score(request: Request, session_id: str = Cookie(None)):
     if not await server.redis_conn.exists(session_id): await server.init_client(session_id)
 
     data = await request.json()
-    inputs = list(data['inputs'])
-
     if session_id is not None:
-        scores = await server.compute_client_scores(session_id, inputs)
+        scores = await server.compute_client_scores(session_id, data['inputs'])
         return JSONResponse(scores)
     else:
         raise HTTPException(status_code=400, detail='No session id')
