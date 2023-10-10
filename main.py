@@ -3,7 +3,7 @@ import io
 import uuid
 import asyncio
 
-from services.server import Server
+from src.server import Server
 from fastapi import FastAPI, Cookie, HTTPException, WebSocket, WebSocketException
 from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles

@@ -8,8 +8,8 @@ import requests
 
 from PIL import Image
 from typing import List, Dict
-from services.backend import Backend
-from services.utils import format_seconds_to_time, reconstruct_sentence
+from src.backend import Backend
+from src.utils import format_seconds_to_time, reconstruct_sentence
 
 class Server(Backend):
     """

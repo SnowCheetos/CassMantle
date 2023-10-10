@@ -6,9 +6,7 @@ import asyncio
 import aioredis
 
 from PIL import Image, ImageFilter
-from typing import List
-from services.utils import reconstruct_sentence, encode_image
-
+from src.utils import reconstruct_sentence, encode_image, api_call
 
 class Backend:
     """
@@ -56,45 +54,30 @@ class Backend:
         else:
             await asyncio.sleep(1)
 
-    async def generate_image(self, prompt: str) -> Image.Image:
-        async with httpx.AsyncClient() as client:
-            retries = 0
-            while retries <= self.max_retries:
-                await self.redis_conn.hset('image', 'status', 'busy')
-                try:
-                    r = await client.post(
-                        url=self.diffuser_url,
-                        headers=self.auth_header,
-                        json={
-                            "inputs": prompt,
-                            "parameters": {
-                                'negative_prompt': 'blurry, distorted, fake, abstract, negative'
-                            }
-                        },
-                        timeout=90
-                    )
-                    r.raise_for_status()
-                    await self.redis_conn.hset('image', 'status', 'idle')
-                    return Image.open(io.BytesIO(r.content))
+    async def generate_image(self, prompt: str):
+        await self.redis_conn.hset('image', 'status', 'busy')
 
-                except httpx.HTTPStatusError as e:
-                    if e.response.status_code == 503:  # Service Unavailable
-                        print("503 from diffuser api")
-                        retries += 1
-                        wait_time = 30 * retries  # Exponential backoff
-                        await asyncio.sleep(wait_time)
-                        continue
-                    else:
-                        print(f"HTTP error occurred with status {e.response.status_code}: {e}")
-                        break
+        response = await api_call(
+            method="POST",
+            url=self.diffuser_url,
+            headers=self.auth_header,
+            json={
+                "inputs": prompt,
+                "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative'}
+            },
+            max_retries=self.max_retries,
+            timeout=90,
+            retry_on_status_codes={503},
+        )
 
-                except Exception as e:
-                    print(f"An error occurred: {e}")
-                    break
-            
-            await self.redis_conn.hset('image', 'status', 'idle')
-            print("Max retries reached or an error occurred.")
+        await self.redis_conn.hset('image', 'status', 'idle')
+
+        if response is not None:
+            return Image.open(io.BytesIO(response.content))
+        else:
+            print("Image generation failed.")
             return None
+
 
     def generate_prompt(self) -> None:
         connection = pika.BlockingConnection(pika.ConnectionParameters(self.rabbit_host))
