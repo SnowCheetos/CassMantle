@@ -1,10 +1,7 @@
 import io
 import json
 import time
-import redis
-import redis.lock
 import asyncio
-import requests
 
 from PIL import Image
 from typing import List, Dict
@@ -19,7 +16,7 @@ class Server(Backend):
     def __init__(
             self, 
             min_score=0.1,
-            time_per_prompt=20 * 60, # 20 minutes
+            time_per_prompt=5 * 60, # 10 minutes
             max_retries=5,
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
             llm_url="https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
@@ -36,31 +33,29 @@ class Server(Backend):
         await self.redis_conn.sadd('sessions', session)
 
     async def fetch_next_prompt(self) -> str:
-        prompts = (await self.redis_conn.hget('prompt', 'next')).decode()
-        if not prompts: return
-        prompts = json.loads(prompts)
+        prompts = await self.redis_conn.hget('prompt', 'next')
+        assert prompts is not None, "[ERROR] No next prompt available"
+
+        prompts = json.loads(prompts.decode())
         return reconstruct_sentence(prompts['tokens'])
 
     async def fetch_prompt_json(self) -> str:
-        prompts = json.loads((await self.redis_conn.hget('prompt', 'current')).decode())
-        for mask in sorted(prompts['masks']):
-            prompts['tokens'][mask] = '*'
+        prompts = await self.redis_conn.hget('prompt', 'next')
+        assert prompts is not None, "[ERROR] No current prompt available"
+
+        prompts = json.loads(prompts.decode())
+        for mask in sorted(prompts['masks']): prompts['tokens'][mask] = '*'
         return prompts
 
     async def fetch_masked_words(self) -> List[str]:
-        prompts = json.loads((await self.redis_conn.hget('prompt', 'current')).decode())
+        prompts = await self.redis_conn.hget('prompt', 'next')
+        assert prompts is not None, "[ERROR] No next prompt available"
+
+        prompts = json.loads(prompts.decode())
         tokens, masks = prompts['tokens'], prompts['masks']
         words = []
-        for mask in sorted(masks):
-            words.append(tokens[mask])
+        for mask in sorted(masks): words.append(tokens[mask])
         return words
-
-    def compute_scores(self, inputs: str, answer: str) -> float:
-        payload = {'inputs': inputs, 'answer': answer}
-        response = requests.post('http://localhost:9000/compute_scores', json=payload)
-        if response.ok:
-            return response.json()
-        raise Exception("Unable to connect to scoring service.")
 
     async def set_index_score(self, session: str, index: int, score: float) -> None:
         field = f'score{index+1}'
@@ -74,7 +69,7 @@ class Server(Backend):
 
     async def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
         words = await self.fetch_masked_words()
-        scores = self.compute_scores(inputs, words).get("scores")
+        scores = (await self.compute_scores(inputs, words)).get("scores")
         results = {}
         for i, score in enumerate(scores):
             await self.set_index_score(session, i, float(score))
@@ -105,21 +100,10 @@ class Server(Backend):
         masked = self.mask_image(image, self.min_score)
         return masked
 
-    async def update_contents(self) -> bool:
-        image = await self.redis_conn.hget('image', 'next')
-        prompt = await self.redis_conn.hget('prompt', 'next')
-        if not image or not prompt: return False
-
-        await self.redis_conn.hset('image', 'current', image)
-        await self.redis_conn.hset('prompt', 'current', prompt)
-        await self.redis_conn.hdel('image', 'next')
-        await self.redis_conn.hdel('prompt', 'next')
-
+    async def reset_sessions(self) -> None:
         sessions = await self.redis_conn.smembers('sessions')
         contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
         for session in sessions: await self.redis_conn.hset(session, mapping=contents)
-
-        return True
 
     async def start_countdown(self) -> None:
         await self.redis_conn.setex('countdown', self.time_per_prompt, 'active')
@@ -133,35 +117,7 @@ class Server(Backend):
 
     async def reset_clock(self) -> None:
         await self.start_countdown()
-
-    async def locked_generate_prompt(self) -> None:
-        async with await self.redis_conn.lock("generation_lock", timeout=5):
-            if await self.redis_conn.get('busy') is None:
-                await self.redis_conn.setex('busy', 5, 1)
-                print("GENERATING PROMPT")
-                if await (self.redis_conn.hget('prompt', 'status')).decode() == 'idle':
-                    await self.generate_prompt()
-
-    # def locked_generate_image(self) -> None:
-    #     with self.redis_conn.lock("generation_lock", timeout=5):
-    #         if self.redis_conn.get('busy') is None:
-    #             self.redis_conn.setex('busy', 5, 1)
-    #             print("GENERATING IMAGE")
-    #             image_status = self.redis_conn.hget('image', 'status').decode()
-    #             next_prompt = self.fetch_next_prompt()
-    #             if image_status == 'idle' and next_prompt:
-    #                 self.generate_image(next_prompt)
-
-    async def locked_generate_image(self) -> None:
-        async with await self.redis_conn.lock("generation_lock", timeout=5):
-            if await self.redis_conn.get('busy') is None:
-                await self.redis_conn.setex('busy', 5, 1)
-                print("GENERATING IMAGE")
-                image_status = (await self.redis_conn.hget('image', 'status')).decode()
-                next_prompt = await self.fetch_next_prompt()
-                if image_status == 'idle' and next_prompt:
-                    asyncio.create_task(self.generate_image(next_prompt))
-                
+    
     async def global_timer(self) -> None:
         # Start the countdown
         await self.start_countdown()
@@ -172,18 +128,14 @@ class Server(Backend):
             remaining_time = await self.fetch_countdown()
 
             # Check if time to generate new prompt
-            if int(remaining_time) == int(self.time_per_prompt * 0.8):
-                await self.locked_generate_prompt()
-
-            if int(remaining_time) == int(self.time_per_prompt * 0.4):
-                await self.locked_generate_image()
+            if int(remaining_time) == int(self.time_per_prompt * 0.7):
+                await self.buffer_contents()
 
             # Check if time's up
             if remaining_time <= 0.5:
-                async with await self.redis_conn.lock("update_lock", timeout=1):
-                    await self.redis_conn.setex("reset", 1, 1)
-                    if await self.update_contents():
-                        print(f'[INFO] Resetting...')
-                        await self.reset_clock()
+                await self.promote_buffer()
+                await self.reset_sessions()
+                await self.reset_clock()
+                await self.redis_conn.setex("reset", 1, 1)
             
             await asyncio.sleep(1)

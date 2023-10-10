@@ -1,6 +1,6 @@
-import base64
 import io
 import uuid
+import base64
 import asyncio
 
 from src.server import Server

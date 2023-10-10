@@ -4,11 +4,13 @@ import json
 import aioredis
 
 from PIL import Image, ImageFilter
+from typing import List, Dict
 from src.utils import encode_image, api_call, construct_prompt_dict
 
 class Backend:
     """
-    This class should be the parent class to Server.
+    This class is the parent class to Server.
+    It handles content generation by making calls to external APIs.
     """
     def __init__(
             self, 
@@ -42,7 +44,7 @@ class Backend:
             ):
                 prompt = await self.init_prompt(seed)
                 await self.init_image(prompt)
-                print("[INFO] Content Initialization Complete.")
+                print("[INFO] Content initialization complete")
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
@@ -71,22 +73,28 @@ class Backend:
                 and
                 await self.redis_conn.hget('image', 'next') is None
             ):
+                print("[INFO] Generating content buffer")
                 prompt = await self.generate_prompt(seed)
                 assert prompt is not None, "[ERROR] Prompt generation failed"
-                prompt_dict = json.dumps(construct_prompt_dict(prompt))
+
+                prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, 3))
                 await self.set_next_prompt(prompt_dict)
 
                 image = await self.generate_image(prompt)
                 assert image is not None, "[ERROR] Image generation failed"
-                await self.set_next_image(prompt)
+
+                encoding = encode_image(image)
+                await self.set_next_image(encoding)
+                print("[INFO] Content buffering complete")
 
     async def promote_buffer(self) -> None:
-        async with self.redis_conn.lock("promotion_lock", timeout=60):
+        async with self.redis_conn.lock("promotion_lock", timeout=10):
             if (
                 await self.redis_conn.hget('prompt', 'next') is not None
                 and
                 await self.redis_conn.hget('image', 'next') is not None
             ):
+                print("[INFO] Promoting content buffer")
                 image = await self.redis_conn.hget('image', 'next')
                 prompt = await self.redis_conn.hget('prompt', 'next')
                 assert image is not None and prompt is not None, "[ERROR] Content buffer error, NoneType encountered"
@@ -95,6 +103,7 @@ class Backend:
                 await self.redis_conn.hset('prompt', 'current', prompt)
                 await self.redis_conn.hdel('image', 'next')
                 await self.redis_conn.hdel('prompt', 'next')
+                print("[INFO] Buffer promotion complete")
 
     async def generate_prompt(self, seed: str) -> str:
         print("[INFO] Generating prompt...")
@@ -112,7 +121,6 @@ class Backend:
             timeout=90,
             retry_on_status_codes={503},
         )
-
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
@@ -137,7 +145,6 @@ class Backend:
             timeout=90,
             retry_on_status_codes={503},
         )
-
         await self.redis_conn.hset('image', 'status', 'idle')
 
         if response is not None:
@@ -145,6 +152,18 @@ class Backend:
         else:
             print("[ERROR] Image generation failed.")
             return None
+        
+    async def compute_scores(self, inputs: str, answer: str) -> Dict[str, List[str]]:
+        response = await api_call(
+            method="POST",
+            url='http://localhost:9000/compute_scores',
+            # headers=self.auth_header,
+            json={'inputs': inputs, 'answer': answer},
+            timeout=3,
+            retry_on_status_codes={503},
+        )
+        if response is not None: return response.json()
+        else: raise Exception("[ERROR] Score calculation failed.")
 
     def score_to_blur(self, score: float, min_blur: float=0.0, max_blur: float=20):
         return min_blur + (1 - score ** 2) * (max_blur - min_blur)
