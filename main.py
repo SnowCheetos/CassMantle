@@ -28,11 +28,12 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 
 @app.on_event("startup")
 async def startup_event():
+    await server.startup()
     asyncio.create_task(server.global_timer())
 
 @app.get("/init_contents")
 async def init_contents():
-    image = server.fetch_init_image()
+    image = await server.fetch_init_image()
     img_io = io.BytesIO()
     image.save(img_io, 'JPEG')
     img_io.seek(0)
@@ -53,7 +54,7 @@ async def read_root():
 async def initialize_session(response: Response):
     session_id = str(uuid.uuid4())
     response.set_cookie(key="session_id", value=session_id)
-    server.init_client(session_id)
+    await server.init_client(session_id)
     return {"message": "Session initialized", "session_id": session_id}
 
 @app.websocket("/clock")
@@ -63,8 +64,8 @@ async def connect_clock(websocket: WebSocket):
     try:
         while True:
             await asyncio.sleep(1)
-            time = server.fetch_clock()
-            reset = bool(server.redis_conn.exists('reset'))
+            time = await server.fetch_clock()
+            reset = bool(await server.redis_conn.exists('reset'))
             await websocket.send_json({"time": time, "reset": reset})
     
     except WebSocketException:
@@ -75,10 +76,10 @@ async def connect_clock(websocket: WebSocket):
 
 @app.get("/client/status")
 async def check_status(session_id: str=Cookie(None)):
-    if not server.redis_conn.exists(session_id): 
-        server.init_client(session_id)
+    if not await server.redis_conn.exists(session_id): 
+        await server.init_client(session_id)
         return JSONResponse(content={'hasWon': 0})
-    scores = server.fetch_client_scores(session_id)
+    scores = await server.fetch_client_scores(session_id)
     if float(scores['max']) > 0.99:
         return JSONResponse(content={'hasWon': 1})
     return JSONResponse(content={'hasWon': 0})
@@ -94,12 +95,12 @@ async def fetch_contents(session_id: str=Cookie(None)):
         }
     }
     """
-    if not server.redis_conn.exists(session_id): server.init_client(session_id)
-    image = server.fetch_masked_image(session_id)
+    if not await server.redis_conn.exists(session_id): await server.init_client(session_id)
+    image = await server.fetch_masked_image(session_id)
     img_io = io.BytesIO()
     image.save(img_io, 'JPEG')
     img_io.seek(0)
-    prompt = server.fetch_prompt_json()
+    prompt = await server.fetch_prompt_json()
     content = {
         "image": base64.b64encode(img_io.getvalue()).decode(),
         "prompt": prompt
@@ -108,13 +109,13 @@ async def fetch_contents(session_id: str=Cookie(None)):
 
 @app.post("/compute_score")
 async def compute_score(request: Request, session_id: str = Cookie(None)):
-    if not server.redis_conn.exists(session_id): server.init_client(session_id)
+    if not await server.redis_conn.exists(session_id): await server.init_client(session_id)
 
     data = await request.json()
     inputs = list(data['inputs'])
 
     if session_id is not None:
-        scores = server.compute_client_scores(session_id, inputs)
+        scores = await server.compute_client_scores(session_id, inputs)
         return JSONResponse(scores)
     else:
         raise HTTPException(status_code=400, detail='No session id')

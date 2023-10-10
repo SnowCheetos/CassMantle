@@ -20,41 +20,40 @@ class Server(Backend):
             self, 
             min_score=0.1,
             time_per_prompt=20 * 60, # 20 minutes
-            rabbit_host='localhost'
+            max_retries=5,
+            rabbit_host='localhost',
+            diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
         ) -> None:
-        super().__init__(rabbit_host)
+        super().__init__(max_retries, rabbit_host, diffuser_url)
 
         self.min_score = min_score
         self.time_per_prompt = time_per_prompt
-        self.redis_conn = redis.Redis(decode_responses=False)
 
-    def init_client(self, session: str) -> None:
-        if self.redis_conn.exists(session): self.redis_conn.delete(session)
+    async def init_client(self, session: str) -> None:
+        if await self.redis_conn.exists(session): await self.redis_conn.delete(session)
         contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
-        self.redis_conn.hset(session, mapping=contents)
-        self.redis_conn.sadd('sessions', session)
+        await self.redis_conn.hset(session, mapping=contents)
+        await self.redis_conn.sadd('sessions', session)
 
-    def fetch_next_prompt(self) -> str:
-        prompts = self.redis_conn.hget('prompt', 'next').decode()
+    async def fetch_next_prompt(self) -> str:
+        prompts = (await self.redis_conn.hget('prompt', 'next')).decode()
         if not prompts: return
         prompts = json.loads(prompts)
         return reconstruct_sentence(prompts['tokens'])
 
-    def fetch_prompt_json(self) -> str:
-        prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
+    async def fetch_prompt_json(self) -> str:
+        prompts = json.loads((await self.redis_conn.hget('prompt', 'current')).decode())
         for mask in sorted(prompts['masks']):
             prompts['tokens'][mask] = '*'
         return prompts
 
-    def fetch_masked_words(self) -> List[str]:
-        prompts = json.loads(self.redis_conn.hget('prompt', 'current').decode())
+    async def fetch_masked_words(self) -> List[str]:
+        prompts = json.loads((await self.redis_conn.hget('prompt', 'current')).decode())
         tokens, masks = prompts['tokens'], prompts['masks']
         words = []
         for mask in sorted(masks):
             words.append(tokens[mask])
         return words
-
-
 
     def compute_scores(self, inputs: str, answer: str) -> float:
         payload = {'inputs': inputs, 'answer': answer}
@@ -63,121 +62,129 @@ class Server(Backend):
             return response.json()
         raise Exception("Unable to connect to scoring service.")
 
-    def set_index_score(self, session: str, index: int, score: float) -> None:
+    async def set_index_score(self, session: str, index: int, score: float) -> None:
         field = f'score{index+1}'
-        self.redis_conn.hset(session, field, float(score))
+        await self.redis_conn.hset(session, field, float(score))
 
-    def set_client_score(self, session: str, score: float) -> None:
-        self.redis_conn.hset(session, 'current', score)
-        max_score = float(self.redis_conn.hget(session, 'max'))
-        if not max_score: self.redis_conn.hset(session, 'max', score)
-        elif score > max_score: self.redis_conn.hset(session, 'max', score)
+    async def set_client_score(self, session: str, score: float) -> None:
+        await self.redis_conn.hset(session, 'current', score)
+        max_score = float(await self.redis_conn.hget(session, 'max'))
+        if not max_score: await self.redis_conn.hset(session, 'max', score)
+        elif score > max_score: await self.redis_conn.hset(session, 'max', score)
 
-
-    def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
-        words = self.fetch_masked_words()
+    async def compute_client_scores(self, session: str, inputs: List[str]) -> Dict[str, str]:
+        words = await self.fetch_masked_words()
         scores = self.compute_scores(inputs, words).get("scores")
         results = {}
         for i, score in enumerate(scores):
-            self.set_index_score(session, i, float(score))
+            await self.set_index_score(session, i, float(score))
             results.update({f'score{i}': score})
         mean_score = sum([float(s) for s in scores]) / len(scores)
-        self.set_client_score(session, mean_score)
+        await self.set_client_score(session, mean_score)
         return results
 
-
-    def fetch_client_scores(self, session: str) -> Dict[str, str]:
-        while self.redis_conn.hget(session, 'status').decode() == 'busy':
+    async def fetch_client_scores(self, session: str) -> Dict[str, str]:
+        while (await self.redis_conn.hget(session, 'status')).decode() == 'busy':
             time.sleep(0.1)
-        contents = self.redis_conn.hgetall(session)
+        contents = await self.redis_conn.hgetall(session)
         contents = {key.decode(): value.decode() for key, value in contents.items()}
         return contents
     
-    def fetch_current_image(self) -> Image.Image:
-        image_bytes = self.redis_conn.hget('image', 'current')
+    async def fetch_current_image(self) -> Image.Image:
+        image_bytes = await self.redis_conn.hget('image', 'current')
         return Image.open(io.BytesIO(image_bytes))
 
-    def fetch_masked_image(self, session: str) -> Image.Image:
-        scores = self.fetch_client_scores(session)
-        image = self.fetch_current_image()
+    async def fetch_masked_image(self, session: str) -> Image.Image:
+        scores = await self.fetch_client_scores(session)
+        image = await self.fetch_current_image()
         masked = self.mask_image(image, float(scores['max']))
         return masked
     
-    def fetch_init_image(self) -> Image.Image:
-        image = self.fetch_current_image()
+    async def fetch_init_image(self) -> Image.Image:
+        image = await self.fetch_current_image()
         masked = self.mask_image(image, self.min_score)
         return masked
 
-    def update_contents(self) -> bool:
-        image = self.redis_conn.hget('image', 'next')
-        prompt = self.redis_conn.hget('prompt', 'next')
+    async def update_contents(self) -> bool:
+        image = await self.redis_conn.hget('image', 'next')
+        prompt = await self.redis_conn.hget('prompt', 'next')
         if not image or not prompt: return False
 
-        self.redis_conn.hset('image', 'current', image)
-        self.redis_conn.hset('prompt', 'current', prompt)
-        self.redis_conn.hdel('image', 'next')
-        self.redis_conn.hdel('prompt', 'next')
+        await self.redis_conn.hset('image', 'current', image)
+        await self.redis_conn.hset('prompt', 'current', prompt)
+        await self.redis_conn.hdel('image', 'next')
+        await self.redis_conn.hdel('prompt', 'next')
 
-        sessions = self.redis_conn.smembers('sessions')
+        sessions = await self.redis_conn.smembers('sessions')
         contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
         for session in sessions:
-            self.redis_conn.hset(session, mapping=contents)
+            await self.redis_conn.hset(session, mapping=contents)
 
         return True
 
-    def start_countdown(self) -> None:
-        self.redis_conn.setex('countdown', self.time_per_prompt, 'active')
+    async def start_countdown(self) -> None:
+        await self.redis_conn.setex('countdown', self.time_per_prompt, 'active')
 
-    def fetch_countdown(self) -> float:
-        return float(self.redis_conn.ttl('countdown'))
+    async def fetch_countdown(self) -> float:
+        return float(await self.redis_conn.ttl('countdown'))
 
-    def fetch_clock(self) -> str:
-        seconds = int(self.fetch_countdown())
+    async def fetch_clock(self) -> str:
+        seconds = int(await self.fetch_countdown())
         return format_seconds_to_time(seconds)
 
-    def reset_clock(self) -> None:
-        self.start_countdown()
+    async def reset_clock(self) -> None:
+        await self.start_countdown()
 
-    def locked_generate_prompt(self) -> None:
-        with self.redis_conn.lock("generation_lock", timeout=5):
-            if self.redis_conn.get('busy') is None:
-                self.redis_conn.setex('busy', 5, 1)
+    async def locked_generate_prompt(self) -> None:
+        async with await self.redis_conn.lock("generation_lock", timeout=5):
+            if await self.redis_conn.get('busy') is None:
+                await self.redis_conn.setex('busy', 5, 1)
                 print("GENERATING PROMPT")
-                if self.redis_conn.hget('prompt', 'status').decode() == 'idle':
-                    self.generate_prompt()
+                if await (self.redis_conn.hget('prompt', 'status')).decode() == 'idle':
+                    await self.generate_prompt()
 
-    def locked_generate_image(self) -> None:
-        with self.redis_conn.lock("generation_lock", timeout=5):
-            if self.redis_conn.get('busy') is None:
-                self.redis_conn.setex('busy', 5, 1)
+    # def locked_generate_image(self) -> None:
+    #     with self.redis_conn.lock("generation_lock", timeout=5):
+    #         if self.redis_conn.get('busy') is None:
+    #             self.redis_conn.setex('busy', 5, 1)
+    #             print("GENERATING IMAGE")
+    #             image_status = self.redis_conn.hget('image', 'status').decode()
+    #             next_prompt = self.fetch_next_prompt()
+    #             if image_status == 'idle' and next_prompt:
+    #                 self.generate_image(next_prompt)
+
+    async def locked_generate_image(self) -> None:
+        async with await self.redis_conn.lock("generation_lock", timeout=5):
+            if await self.redis_conn.get('busy') is None:
+                await self.redis_conn.setex('busy', 5, 1)
                 print("GENERATING IMAGE")
-                image_status = self.redis_conn.hget('image', 'status').decode()
-                next_prompt = self.fetch_next_prompt()
+                image_status = (await self.redis_conn.hget('image', 'status')).decode()
+                next_prompt = await self.fetch_next_prompt()
                 if image_status == 'idle' and next_prompt:
-                    self.generate_image(next_prompt)
+                    asyncio.create_task(self.generate_image(next_prompt))
                 
     async def global_timer(self) -> None:
         # Start the countdown
-        self.start_countdown()
+        await self.start_countdown()
         await asyncio.sleep(1)
         
         while True:
             # Fetch remaining time
-            remaining_time = self.fetch_countdown()
+            remaining_time = await self.fetch_countdown()
 
             # Check if time to generate new prompt
             if int(remaining_time) == int(self.time_per_prompt * 0.8):
-                self.locked_generate_prompt()
+                await self.locked_generate_prompt()
 
             if int(remaining_time) == int(self.time_per_prompt * 0.4):
-                self.locked_generate_image()
+                await self.locked_generate_image()
 
             # Check if time's up
             if remaining_time <= 0.5:
-                with self.redis_conn.lock("update_lock", timeout=1):
-                    self.redis_conn.setex("reset", 1, 1)
-                    if self.update_contents():
+                async with await self.redis_conn.lock("update_lock", timeout=1):
+                    await self.redis_conn.setex("reset", 1, 1)
+                    if await self.update_contents():
                         print(f'[INFO] Resetting...')
-                        self.reset_clock()
+                        await self.reset_clock()
             
             await asyncio.sleep(1)

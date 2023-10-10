@@ -1,6 +1,14 @@
+import io
 import string
 import random
+from PIL import Image
 from typing import List
+
+def encode_image(image: Image.Image) -> bytes:
+    image_bytes_io = io.BytesIO()
+    image.save(image_bytes_io, format='JPEG')
+    image_bytes = image_bytes_io.getvalue()
+    return image_bytes
 
 def reconstruct_sentence(tokens: List[str]) -> str:
     sentence = ""
