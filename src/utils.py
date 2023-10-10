@@ -1,10 +1,15 @@
 import io
+import nltk
 import string
 import random
 import httpx
 import asyncio
+from nltk.tokenize import word_tokenize
+from nltk.corpus import brown, stopwords
 from PIL import Image
 from typing import List, Optional, Any, Dict
+
+freq_dist = nltk.FreqDist(w.lower() for w in brown.words())
 
 def encode_image(image: Image.Image) -> bytes:
     image_bytes_io = io.BytesIO()
@@ -83,3 +88,52 @@ async def api_call(
     
     print("Max retries reached or an error occurred.")
     return None
+
+def word_complexity(word: str) -> int:
+    # Use a large number to ensure that less frequent words get higher values
+    LARGE_NUM = 1e6
+
+    # The less frequent the word, the higher the complexity score from the freq_dist
+    freq_score = LARGE_NUM - freq_dist[word.lower()]
+
+    # Combine the frequency score and the word length
+    return freq_score + len(word)
+
+def select_descriptive_words(inputs: str, prompt: str, num_words: int=2) -> List[str]:
+    # Load stop words
+    stop_words = set(stopwords.words('english'))
+    
+    # Tokenize and POS tag words
+    words = word_tokenize(prompt)
+    skips = word_tokenize(inputs)
+    
+    tagged_words = nltk.pos_tag(words)
+    
+    # Filter words
+    filtered_words = [
+        word for word, pos in tagged_words
+        if word.lower() not in stop_words
+        and all(char not in string.punctuation for char in word)  # Exclude punctuation
+        and "'" not in word
+        and "-" not in word
+        and pos not in ['NNP', 'NNPS']  # Exclude proper nouns
+        and word not in skips
+    ]
+
+    word_scores = {word: word_complexity(word) for word in filtered_words}
+
+    selected_words = weighted_sample_without_replacement(
+        list(word_scores.keys()),
+        list(word_scores.values()),
+        min(num_words, len(filtered_words))
+    )
+
+    indices = [words.index(word) for word in selected_words]
+    return indices
+
+def construct_prompt_dict(input_text: str, prompt: str, num_masked: int) -> Dict[str, List[str]]:
+    masks = select_descriptive_words(input_text, prompt, num_masked)
+    return {
+        'tokens': word_tokenize(prompt),
+        'masks': masks
+    }

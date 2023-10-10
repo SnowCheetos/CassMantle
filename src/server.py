@@ -21,10 +21,10 @@ class Server(Backend):
             min_score=0.1,
             time_per_prompt=20 * 60, # 20 minutes
             max_retries=5,
-            rabbit_host='localhost',
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+            llm_url="https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
         ) -> None:
-        super().__init__(max_retries, rabbit_host, diffuser_url)
+        super().__init__(max_retries, diffuser_url, llm_url)
 
         self.min_score = min_score
         self.time_per_prompt = time_per_prompt
@@ -117,8 +117,7 @@ class Server(Backend):
 
         sessions = await self.redis_conn.smembers('sessions')
         contents = {'max': self.min_score, 'current': self.min_score, 'status': 'idle'}
-        for session in sessions:
-            await self.redis_conn.hset(session, mapping=contents)
+        for session in sessions: await self.redis_conn.hset(session, mapping=contents)
 
         return True
 
