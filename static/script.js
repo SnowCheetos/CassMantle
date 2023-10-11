@@ -6,10 +6,6 @@ fetch('./data/en_US.aff').then(response => response.text()).then((affData) => {
         dictionary = new Typo("en_US", affData, dicData);
         console.log("Dictionary Loaded");
         dictionaryReady = true;
-
-        if (document.readyState === "complete" && dictionaryReady) {
-            hideLoadingPage();
-        }
     });
 });
 
@@ -20,7 +16,6 @@ function hideLoadingPage() {
 
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
-    populateInitContent();
 
     const cookieNotification = document.getElementById("cookie-notification");
     const acceptButton = document.getElementById("accept-cookies");
@@ -29,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!localStorage.getItem("cookiesAccepted")) {
         cookieNotification.style.display = "block";
     } else {
+        hideLoadingPage();
         initializeAppLogic(); // If cookies were already accepted, run the initialization logic.
     }
 
@@ -43,16 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
         hideLoadingPage();
     }
 });
-
-async function populateInitContent() {
-    try {
-        const response = await fetch(`/init_contents/`);
-        const data = await response.json();
-        displayImage(data.image);
-    } catch (err) {
-        console.error("Error fetching contents:", err);
-    }
-}
 
 function initializeAppLogic() {
     initializeApp().then(app => {
@@ -96,24 +82,31 @@ function initializeApp() {
 
     async function initializeSession() {
         try {
-            sessionId = localStorage.getItem('session_id');
-            if (!sessionId) {
-                const response = await fetch("/init");
-                const data = await response.json();
-                console.log("Session initialized:", data.session_id);
-                sessionId = data.session_id;
+            const response = await fetch("/client/status", {
+                method: "GET",
+                credentials: 'include', // Ensure cookies are included with the request
+            });
+            
+            const data = await response.json();
     
-                // Store session_id in localStorage
-                localStorage.setItem('session_id', sessionId);
+            // Check the session status here and initialize if needed
+            if (data.needInitialization) {
+                const initResponse = await fetch("/init", {
+                    method: "GET",
+                    credentials: 'include', // Ensure cookies are included with the request
+                });
+                const initData = await initResponse.json();
+                console.log("Session initialized:", initData.session_id);
             } else {
-                console.log("Session ID retrieved from localStorage:", sessionId);
+                console.log("Existing session detected.");
             }
-            return sessionId;
+    
         } catch (err) {
-            throw err;
+            console.error("Error initializing session:", err);
         }
-    }    
-
+    }
+    
+    
     function initializeWebSocket() {
         const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + "/clock");
 
@@ -130,7 +123,11 @@ function initializeApp() {
 
     async function fetchAndDisplayContents(prompt) {
         try {
-            const response = await fetch(`/fetch/contents?session_id=${sessionId}`);
+            const response = await fetch('/fetch/contents', {
+                method: "GET",
+                credentials: 'include'
+            });
+                 //?session_id=${sessionId}`);
             const data = await response.json();
             displayImage(data.image);
             if (prompt === true) {
@@ -248,6 +245,11 @@ function createSubmitButton(app) {
     appContainer.appendChild(submitButton);
 }
 
+function getScoreColor(score) {
+    const red = Math.floor((1 - score) * 255);
+    const green = Math.floor(score * 255);
+    return `rgb(${red}, ${green}, 0)`;
+}
 
 function displayPrompt(promptData) {
     const { tokens, masks } = promptData;
@@ -260,22 +262,25 @@ function displayPrompt(promptData) {
     
     tokens.forEach((token, index) => {
         if (masks.includes(index)) {
-            // If the index is in masks, add an input field
+            var score = parseFloat(promptData.scores[index]);
             const inputField = document.createElement("input");
             const span = document.createElement("span");
             span.textContent = " ";
             promptContainer.appendChild(span);
             inputField.type = "text";
             inputField.id = `${index}`;
+            inputField.placeholder = (score > 0.1) ? `${(score * 100).toFixed(2)} %` : "";
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
             inputField.style.fontSize = "16px";
             inputField.style.textAlign = 'center';
-            inputField.style.fontFamily = "Arial, sans-serif";
+            inputField.style.fontFamily = "Courier New, monospace";
             inputField.style.margin = "3px";
             inputField.style.transition = 'background 0.3s';
+
             promptContainer.appendChild(inputField);
+
         } else {
             // Otherwise, add a span with the token
             const span = document.createElement("span");
@@ -343,6 +348,7 @@ function submitInputs(app) {
 
     fetch("/compute_score", {
         method: "POST",
+        credentials: 'include',
         headers: {
             "Content-Type": "application/json"
         },

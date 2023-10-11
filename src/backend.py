@@ -39,6 +39,7 @@ class Backend:
         return await aioredis.Redis(host='localhost', decode_responses=False)
 
     async def startup(self) -> None:
+        await asyncio.sleep(random.random())
         self.redis_conn = await self.initialize_redis()
 
         await self.redis_conn.hset('prompt', 'status', 'idle')
@@ -124,7 +125,10 @@ class Backend:
             headers=self.auth_header,
             json={
                 "inputs": seed,
-                "parameters": {"max_new_tokens": 64}
+                "parameters": {
+                    "min_new_tokens": 32,
+                    "max_new_tokens": 96
+                }
             },
             max_retries=self.max_retries,
             timeout=90,

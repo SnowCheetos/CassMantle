@@ -4,6 +4,7 @@ html, body {
     display: flex;
     flex-direction: column;
     font-family: Courier New, monospace;
+    background-color: #646262b4;
 }
 
 #app {
@@ -61,6 +62,8 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
+    text-align: center;
+    text-shadow: 2px 2px 2px rgba(161, 161, 161, 0.9);
 }
 
 /* p {
@@ -123,6 +126,11 @@ html, body {
     background-color: #4e4e4e;  /* Even darker shade of blue */
     transform: scale(1);  /* Reset the size to original when pressed */
 }
+
+input:hover::placeholder {
+    color: transparent;
+}
+
 
 a {
     color: rgb(201, 201, 201);

@@ -128,7 +128,7 @@ def select_descriptive_words(inputs: str, prompt: str, num_words: int=2) -> List
         min(num_words, len(filtered_words))
     )
 
-    indices = [words.index(word) for word in selected_words]
+    indices = sorted([words.index(word) for word in selected_words])
     return indices
 
 def construct_prompt_dict(input_text: str, prompt: str, num_masked: int) -> Dict[str, List[str]]:

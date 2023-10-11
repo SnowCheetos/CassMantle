@@ -10,13 +10,14 @@ class ScoreService:
     def __init__(
             self,
             min_score=0.1,
-            model='glove-twitter-100', #'word2vec-google-news-300',
+            model='word2vec-google-news-300',
         ) -> None:
         
         self.min_score = min_score
         self.model = gensim.downloader.load(model)
 
     def compute_score(self, inputs: str, answer: str) -> float:
+        if inputs == answer: return 1.0
         score = self.model.similarity(inputs.lower(), answer.lower())
         return max(self.min_score, score)
     
