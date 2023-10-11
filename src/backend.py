@@ -46,7 +46,7 @@ class Backend:
         await self.redis_conn.hset('image', 'status', 'idle')
 
         seed = await self.select_seed()
-        async with self.redis_conn.lock("startup_lock", timeout=60):
+        async with self.redis_conn.lock("startup_lock", timeout=180):
             if (
                 await self.redis_conn.hget('prompt', 'current') is None
                 and
@@ -77,7 +77,7 @@ class Backend:
 
     async def buffer_contents(self) -> None:
         seed = await self.select_seed()
-        async with self.redis_conn.lock("buffer_lock", timeout=60):
+        async with self.redis_conn.lock("buffer_lock", timeout=180):
             if (
                 await self.redis_conn.hget('prompt', 'next') is None
                 and
@@ -98,7 +98,7 @@ class Backend:
                 print("[INFO] Content buffering complete")
 
     async def promote_buffer(self) -> None:
-        async with self.redis_conn.lock("promotion_lock", timeout=10):
+        async with self.redis_conn.lock("promotion_lock", timeout=60):
             if (
                 await self.redis_conn.hget('prompt', 'next') is not None
                 and
