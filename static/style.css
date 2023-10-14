@@ -63,16 +63,10 @@ html, body {
     justify-content: center;
     align-items: center;
     text-align: center;
-    text-shadow: 2px 2px 2px rgba(161, 161, 161, 0.9);
+    text-shadow: 2px 2px 2px rgba(36, 36, 36, 0.9);
+    color: #fff;
+    font-size: 20px;
 }
-
-/* p {
-    font-size: 24px;
-    color: white;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border-radius: 5px;
-} */
 
 #cookie-banner {
     position: fixed;
@@ -170,6 +164,20 @@ a {
     cursor: pointer;
     color: "black";
 }
+
+@keyframes blink {
+    0%, 100% {
+        color: red;
+    }
+    50% {
+        color: rgb(80, 80, 80);
+    }
+}
+
+.blink-red {
+    animation: blink 1s infinite;
+}
+
 
 /* Hide the default scrollbar */
 ::-webkit-scrollbar {

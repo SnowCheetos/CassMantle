@@ -1,6 +1,7 @@
 aioredis[hiredis]
 uvicorn[standard]
 fastapi
+slowapi
 gensim
 invisible_watermark 
 transformers 

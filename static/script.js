@@ -164,10 +164,17 @@ function initializeApp() {
 }
 
 function updateClock(time) {
-    // Update the DOM with the new time
     const clockElement = document.getElementById('clock');
     clockElement.textContent = time;
+    const [minutes, seconds] = time.split(":").map(Number);
+
+    if (minutes === 0 && seconds < 60) {
+        clockElement.classList.add('blink-red');
+    } else {
+        clockElement.classList.remove('blink-red');
+    }
 }
+
 
 function displayImage(imageData) {
     const imageElement = document.getElementById("generated-image");
@@ -210,7 +217,8 @@ function createSubmitButton(app) {
     // Create the submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'submit-button';
-    submitButton.textContent = 'Submit Gusses';
+    submitButton.textContent = 'Submit';
+
 
     // Append the submit button to the document body (or to a specific container if needed)
     document.body.appendChild(submitButton);
@@ -277,7 +285,7 @@ function displayPrompt(promptData) {
             promptContainer.appendChild(span);
             inputField.type = "text";
             inputField.id = `${index}`;
-            inputField.placeholder = (score > 0.1) ? `${(score * 100).toFixed(2)} %` : "";
+            inputField.placeholder = (score > 0) ? `${(score * 100).toFixed(2)} %` : "";
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';

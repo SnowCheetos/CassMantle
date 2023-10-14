@@ -9,10 +9,23 @@ from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
-app = FastAPI()
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+app = FastAPI(docs_url=None, redoc_url=None)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 server = Server(time_per_prompt=15*60)
+
+app.mount("/static", StaticFiles(directory="./static/"), name="static")
+app.mount("/data", StaticFiles(directory="data"), name="data")
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,9 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="./static/"), name="static")
-app.mount("/data", StaticFiles(directory="data"), name="data")
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# This registers a custom function to handle requests when rate limit is exceeded
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.on_event("startup")
 async def startup_event():
@@ -32,17 +44,20 @@ async def startup_event():
     asyncio.create_task(server.global_timer())
 
 @app.get("/")
-async def read_root():
+@limiter.limit("3/second")
+async def read_root(request: Request,):
     return FileResponse("./static/index.html")
 
 @app.get("/init")
-async def initialize_session(response: Response):
+@limiter.limit("2/second")
+async def initialize_session(request: Request, response: Response):
     session_id = str(uuid.uuid4())
     response.set_cookie(key="session_id", value=session_id)
     await server.init_client(session_id)
     return {"message": "Session initialized", "session_id": session_id}
 
 @app.websocket("/clock")
+@limiter.limit("2/second")
 async def connect_clock(websocket: WebSocket):
     await websocket.accept()
     print('[INFO] Client Connected.')
@@ -63,7 +78,8 @@ async def connect_clock(websocket: WebSocket):
         print('[INFO] Client Disconnected.')
 
 @app.get("/client/status")
-async def check_status(session_id: str=Cookie(None)):
+@limiter.limit("2/second")
+async def check_status(request: Request, session_id: str=Cookie(None)):
     # Check if session_id exists and is valid
     if not session_id or not await server.redis_conn.exists(session_id): 
         # If not, signal the client that initialization is needed
@@ -76,7 +92,8 @@ async def check_status(session_id: str=Cookie(None)):
     return JSONResponse(content=f)
 
 @app.get("/fetch/contents")
-async def fetch_contents(session_id: str=Cookie(None)):
+@limiter.limit("2/second")
+async def fetch_contents(request: Request, session_id: str=Cookie(None)):
     if not await server.redis_conn.exists(session_id): 
         await server.init_client(session_id)
     image = await server.fetch_masked_image(session_id)
@@ -91,6 +108,7 @@ async def fetch_contents(session_id: str=Cookie(None)):
     return JSONResponse(content=content)
 
 @app.post("/compute_score")
+@limiter.limit("2/second")
 async def compute_score(request: Request, session_id: str = Cookie(None)):
     if not await server.redis_conn.exists(session_id): 
         await server.init_client(session_id)

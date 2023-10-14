@@ -14,7 +14,7 @@ class Server(Backend):
     """
     def __init__(
             self, 
-            min_score=0.1,
+            min_score=0.01,
             time_per_prompt=600, # 10 minutes
             max_retries=5,
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
@@ -31,7 +31,7 @@ class Server(Backend):
         await self.redis_conn.delete(session)
         prompt = await self.fetch_current_prompt()
         contents = {'max': self.min_score, 'won': 0}
-        for m in prompt['masks']: contents.update({str(m): self.min_score})
+        for m in prompt['masks']: contents.update({str(m): 0.0})
         await self.redis_conn.hset(session, mapping=contents)
 
     async def fetch_current_image(self) -> Image.Image:
