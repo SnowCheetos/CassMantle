@@ -9,7 +9,6 @@ from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware import Middleware
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -17,7 +16,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 app = FastAPI(docs_url=None, redoc_url=None)
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, default_limits=["3/second"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -35,9 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# This registers a custom function to handle requests when rate limit is exceeded
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 @app.on_event("startup")
 async def startup_event():
     await server.startup()
@@ -45,7 +41,7 @@ async def startup_event():
 
 @app.get("/")
 @limiter.limit("3/second")
-async def read_root(request: Request,):
+async def read_root(request: Request):
     return FileResponse("./static/index.html")
 
 @app.get("/init")
@@ -57,7 +53,7 @@ async def initialize_session(request: Request, response: Response):
     return {"message": "Session initialized", "session_id": session_id}
 
 @app.websocket("/clock")
-@limiter.limit("2/second")
+# @limiter.limit("2/second")
 async def connect_clock(websocket: WebSocket):
     await websocket.accept()
     print('[INFO] Client Connected.')
