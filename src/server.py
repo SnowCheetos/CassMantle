@@ -1,6 +1,5 @@
 import io
 import json
-import time
 import asyncio
 
 from PIL import Image
@@ -16,14 +15,12 @@ class Server(Backend):
     def __init__(
             self, 
             min_score=0.1,
-            time_per_prompt=10 * 60, # 10 minutes
+            time_per_prompt=600, # 10 minutes
             max_retries=5,
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
             llm_url="https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
         ) -> None:
-        super().__init__(max_retries, diffuser_url, llm_url)
-
-        self.min_score = min_score
+        super().__init__(min_score, max_retries, diffuser_url, llm_url)
         self.time_per_prompt = time_per_prompt
 
     async def init_client(self, session: str) -> None:
@@ -69,8 +66,7 @@ class Server(Backend):
             await self.redis_conn.hset(session, 'max', mean_score)
 
         for key in scores.keys():
-            if float(scores[key]) > float(curr_scores[key]):
-                await self.redis_conn.hset(session, key, scores[key])
+            await self.redis_conn.hset(session, key, scores[key])
         
         await self.redis_conn.hset(session, 'won', int(mean_score == 1))
         scores.update({'won': int(mean_score == 1)})

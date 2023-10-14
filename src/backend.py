@@ -3,7 +3,7 @@ import json
 import asyncio
 import random
 import aioredis
-
+from gensim.models import KeyedVectors
 from PIL import Image, ImageFilter
 from typing import List, Dict
 from src.utils import encode_image, api_call, construct_prompt_dict
@@ -15,11 +15,13 @@ class Backend:
     """
     def __init__(
             self, 
+            min_score=0.1,
             max_retries=5,
             diffuser_url="https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
             llm_url="https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
         ) -> None:
         
+        self.min_score = min_score
         with open('api_key.txt', 'r') as f: API_TOKEN = f.readline()
         
         self.seeds = []
@@ -31,6 +33,8 @@ class Backend:
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
         self.auth_header = {"Authorization": f"Bearer {API_TOKEN}"}
+
+        self.wv = KeyedVectors.load("data/word2vec.wordvectors", mmap='r')
 
     async def select_seed(self) -> str:
         return self.seeds[random.randint(0, len(self.seeds) - 1)]
@@ -127,7 +131,8 @@ class Backend:
                 "inputs": seed,
                 "parameters": {
                     "min_new_tokens": 32,
-                    "max_new_tokens": 96
+                    "max_new_tokens": 96,
+                    "do_sample": True
                 }
             },
             max_retries=self.max_retries,
@@ -166,17 +171,32 @@ class Backend:
             print("[ERROR] Image generation failed.")
             return None
         
-    async def compute_scores(self, pairs: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
-        response = await api_call(
-            method="POST",
-            url='http://localhost:9000/compute_scores',
-            # headers=self.auth_header,
-            json=pairs,
-            timeout=3,
-            retry_on_status_codes={503},
-        )
-        if response is not None: return response.json()
-        else: raise Exception("[ERROR] Score calculation failed.")
+    # async def compute_scores(self, pairs: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
+    #     response = await api_call(
+    #         method="POST",
+    #         url='http://localhost:9000/compute_scores',
+    #         # headers=self.auth_header,
+    #         json=pairs,
+    #         timeout=3,
+    #         retry_on_status_codes={503},
+    #     )
+    #     if response is not None: return response.json()
+    #     else: raise Exception("[ERROR] Score calculation failed.")
+    
+    def most_similar(self, word: str, topn: int=50) -> List[str]:
+        return self.wv.most_similar(word, topn=topn)
+
+    def compute_score(self, inputs: str, answer: str) -> float:
+        if inputs == answer: return 1.0
+        score = self.wv.similarity(inputs.lower(), answer.lower())
+        return max(self.min_score, score)
+
+    async def compute_scores(self, data: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
+        scores = {}
+        for key in data.keys():
+            score = self.compute_score(data[key]['input'], data[key]['answer'])
+            scores.update({key: str(score)})
+        return scores
 
     def score_to_blur(self, score: float, min_blur: float=0.0, max_blur: float=20):
         return min_blur + (1 - score ** 2) * (max_blur - min_blur)
