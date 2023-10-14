@@ -202,7 +202,7 @@ function createSubmitButton(app) {
     // Create the submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'submit-button';
-    submitButton.textContent = 'SUBMIT';
+    submitButton.textContent = 'Submit Gusses';
 
     // Append the submit button to the document body (or to a specific container if needed)
     document.body.appendChild(submitButton);

@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 api_key.txt
+*.wordvectors
+*.npy

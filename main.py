@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
 app = FastAPI()
-server = Server()
+server = Server(time_per_prompt=15*60)
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,8 +64,6 @@ async def connect_clock(websocket: WebSocket):
 
 @app.get("/client/status")
 async def check_status(session_id: str=Cookie(None)):
-    print(session_id)
-    
     # Check if session_id exists and is valid
     if not session_id or not await server.redis_conn.exists(session_id): 
         # If not, signal the client that initialization is needed
@@ -79,7 +77,6 @@ async def check_status(session_id: str=Cookie(None)):
 
 @app.get("/fetch/contents")
 async def fetch_contents(session_id: str=Cookie(None)):
-    print(session_id)
     if not await server.redis_conn.exists(session_id): 
         await server.init_client(session_id)
     image = await server.fetch_masked_image(session_id)
@@ -95,7 +92,6 @@ async def fetch_contents(session_id: str=Cookie(None)):
 
 @app.post("/compute_score")
 async def compute_score(request: Request, session_id: str = Cookie(None)):
-    print(session_id)
     if not await server.redis_conn.exists(session_id): 
         await server.init_client(session_id)
     data = await request.json()
