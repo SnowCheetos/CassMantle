@@ -9,6 +9,15 @@ fetch('./data/en_US.aff').then(response => response.text()).then((affData) => {
     });
 });
 
+document.getElementById('policy-link').addEventListener('click', function(e){
+    e.preventDefault();
+    document.getElementById('policy-modal').style.display = 'flex';
+});
+
+document.getElementById('close-policy').addEventListener('click', function(){
+    document.getElementById('policy-modal').style.display = 'none';
+});
+
 function hideLoadingPage() {
     const loadingContainer = document.querySelector(".loading-container");
     loadingContainer.style.display = "none";
@@ -89,11 +98,10 @@ function initializeApp() {
             
             const data = await response.json();
     
-            // Check the session status here and initialize if needed
             if (data.needInitialization) {
                 const initResponse = await fetch("/init", {
                     method: "GET",
-                    credentials: 'include', // Ensure cookies are included with the request
+                    credentials: 'include',
                 });
                 const initData = await initResponse.json();
                 console.log("Session initialized:", initData.session_id);

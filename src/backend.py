@@ -198,7 +198,7 @@ class Backend:
             scores.update({key: str(score)})
         return scores
 
-    def score_to_blur(self, score: float, min_blur: float=0.0, max_blur: float=20):
+    def score_to_blur(self, score: float, min_blur: float=0.0, max_blur: float=15):
         return min_blur + (1 - score ** 2) * (max_blur - min_blur)
 
     def mask_image(self, image: Image.Image, score: float) -> Image.Image:
