@@ -10,4 +10,4 @@ safetensors
 diffusers
 pillow
 nltk
-httpx
+aiohttp

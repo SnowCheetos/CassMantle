@@ -144,13 +144,13 @@ class Backend:
                 }
             },
             max_retries=self.max_retries,
-            timeout=90,
+            timeout=60,
             retry_on_status_codes={503},
         )
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
-            return '.'.join(response.json()[0].get('generated_text').split('.')[:2]) + '.'
+            return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
         else:
             print("[ERROR] Prompt generation failed.")
             return None
@@ -174,7 +174,7 @@ class Backend:
         await self.redis_conn.hset('image', 'status', 'idle')
 
         if response is not None:
-            return Image.open(io.BytesIO(response.content))
+            return Image.open(io.BytesIO(response))
         else:
             print("[ERROR] Image generation failed.")
             return None
