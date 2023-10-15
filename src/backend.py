@@ -57,15 +57,15 @@ class Backend:
         await self.redis_conn.hset('image', 'status', 'idle')
 
         seed = await self.select_seed()
-        async with self.redis_conn.lock("startup_lock", timeout=300):
-            if (
-                await self.redis_conn.hget('prompt', 'current') is None
-                and
-                await self.redis_conn.hget('image', 'current') is None
-            ):
-                prompt = await self.init_prompt(seed)
-                await self.init_image(prompt)
-                print("[INFO] Content initialization complete")
+        # async with self.redis_conn.lock("startup_lock", timeout=300):
+        if (
+            await self.redis_conn.hget('prompt', 'current') is None
+            and
+            await self.redis_conn.hget('image', 'current') is None
+        ):
+            prompt = await self.init_prompt(seed)
+            await self.init_image(prompt)
+            print("[INFO] Content initialization complete")
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
