@@ -185,7 +185,10 @@ class Backend:
 
     def compute_score(self, inputs: str, answer: str) -> float:
         if inputs == answer: return 1.0
-        score = self.wv.similarity(inputs.lower(), answer.lower())
+        try:
+            score = self.wv.similarity(inputs.lower(), answer.lower())
+        except KeyError:
+            score = self.min_score
         return max(self.min_score, score)
 
     async def compute_scores(self, data: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
