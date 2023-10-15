@@ -3,6 +3,7 @@ import json
 import asyncio
 import random
 import aioredis
+import aiohttp
 from gensim.models import KeyedVectors
 from PIL import Image, ImageFilter
 from typing import List, Dict
@@ -34,6 +35,7 @@ class Backend:
             for line in f.readlines():
                 self.styles.append(line.strip())
 
+        self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60))
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
@@ -131,10 +133,11 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'busy')
 
         response = await api_call(
+            self.http_session,
             method="POST",
             url=self.llm_url,
             headers=self.auth_header,
-            json={
+            json_payload={
                 "inputs": seed,
                 "parameters": {
                     "min_new_tokens": 32,
@@ -160,10 +163,11 @@ class Backend:
         style = await self.select_style()
         print(f"[INFO] Generating image with {style} style...")
         response = await api_call(
+            self.http_session,
             method="POST",
             url=self.diffuser_url,
             headers=self.auth_header,
-            json={
+            json_payload={
                 "inputs": prompt + f' {style} style.',
                 "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative, weird, bad'}
             },
@@ -180,12 +184,16 @@ class Backend:
             return None
     
     def most_similar(self, word: str, topn: int=50) -> List[str]:
-        return self.wv.most_similar(word, topn=topn)
+        try:
+            return self.wv.most_similar(word.lower(), topn=topn)
+        except KeyError as e:
+            raise Exception("Word not in dictionary. ", e)
 
     def compute_score(self, inputs: str, answer: str) -> float:
+        inputs, answer = inputs.lower(), answer.lower()
         if inputs == answer: return 1.0
         try:
-            score = self.wv.similarity(inputs.lower(), answer.lower())
+            score = self.wv.similarity(inputs, answer)
         except KeyError:
             score = self.min_score
         return max(self.min_score, score)

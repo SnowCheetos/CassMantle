@@ -32,7 +32,7 @@ class Server(Backend):
             await self.redis_conn.sadd('sessions', session)
 
     async def reset_client(self, session: str) -> None:
-        await self.redis_conn.delete(session)
+        # await self.redis_conn.delete(session)
         prompt = await self.fetch_current_prompt()
         contents = {'max': self.min_score, 'won': 0, 'attempts': 0}
         for m in prompt['masks']: contents.update({str(m): 0.0})
