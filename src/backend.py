@@ -80,9 +80,11 @@ class Backend:
         
         except LockError:
             print("[INFO] Worker could not acquire lock, moving on.")
+            return
 
         except Exception as e:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
+            return
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
@@ -139,9 +141,11 @@ class Backend:
         
         except LockError:
             print("[INFO] Worker could not acquire lock, moving on.")
+            return
 
         except Exception as e:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
+            return
 
     async def promote_buffer(self) -> None:
         try:
@@ -168,9 +172,11 @@ class Backend:
 
         except LockError:
             print("[INFO] Worker could not acquire lock, moving on.")
+            return
 
         except Exception as e:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
+            return
 
     async def generate_prompt(self, seed: str) -> str:
         print("[INFO] Generating prompt...")
