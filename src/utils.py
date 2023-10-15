@@ -106,13 +106,12 @@ async def api_call(
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
                 async with session.request(
-                    method, url, headers=headers, json=json_payload, ssl=False,
+                    method, url, headers=headers, json=json_payload, ssl=False
                 ) as response:
                     await session.close()
                     response.raise_for_status()
-                    resp = await response.read()
                     gc.collect()
-                    return resp
+                    return await response.read()
 
         except aiohttp.ClientResponseError as e:
             if e.status in retry_on_status_codes:
