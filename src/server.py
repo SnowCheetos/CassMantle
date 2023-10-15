@@ -37,9 +37,10 @@ class Server(Backend):
         contents = {'max': self.min_score, 'won': 0, 'attempts': 0}
         for m in prompt['masks']: contents.update({str(m): 0.0})
         await self.redis_conn.hset(session, mapping=contents)
+        await self.redis_conn.expire(session, self.time_per_prompt)
 
-    async def flush_session(self, session: str) -> None:
-        await self.redis_conn.delete(session)
+    async def remove_connection(self, session: str) -> None:
+        # await self.redis_conn.delete(session)
         await self.redis_conn.srem('sessions', session)
 
     async def player_count(self) -> int:
