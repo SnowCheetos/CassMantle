@@ -3,7 +3,8 @@ import json
 import asyncio
 import random
 import aioredis
-import aiohttp
+
+from aioredis.exceptions import LockError
 from gensim.models import KeyedVectors
 from PIL import Image, ImageFilter
 from typing import List, Dict
@@ -42,6 +43,9 @@ class Backend:
         self.auth_header = {"Authorization": f"Bearer {API_TOKEN}"}
         self.wv = KeyedVectors.load("data/word2vec.wordvectors", mmap='r')
 
+        self.lock_timeout = 120
+        self.acquire_timeout = 2
+
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
 
@@ -59,15 +63,26 @@ class Backend:
         await self.redis_conn.hset('image', 'status', 'idle')
 
         seed = await self.select_seed()
-        async with self.redis_conn.lock("startup_lock", timeout=90):
-            if (
-                await self.redis_conn.hget('prompt', 'current') is None
-                and
-                await self.redis_conn.hget('image', 'current') is None
+        try:
+            async with self.redis_conn.lock(
+                "startup_lock", 
+                timeout=self.lock_timeout,
+                blocking_timeout=self.acquire_timeout
             ):
-                prompt = await self.init_prompt(seed)
-                await self.init_image(prompt)
-                print("[INFO] Content initialization complete")
+                if (
+                    await self.redis_conn.hget('prompt', 'current') is None
+                    and
+                    await self.redis_conn.hget('image', 'current') is None
+                ):
+                    prompt = await self.init_prompt(seed)
+                    await self.init_image(prompt)
+                    print("[INFO] Content initialization complete")
+        
+        except LockError:
+            print("[INFO] Worker could not acquire lock, moving on.")
+
+        except Exception as e:
+            print(f"[ERROR] An unexpected error occurred: {str(e)}")
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
@@ -88,45 +103,74 @@ class Backend:
     async def set_next_image(self, image: bytes) -> None:
         await self.redis_conn.hset('image', 'next', image)
 
+    async def check_generate_condition(self) -> bool:
+        return (
+            await self.redis_conn.hget('prompt', 'status').decode() == 'idle'
+            and
+            await self.redis_conn.hget('image', 'status').decode() == 'idle'
+        )
+
     async def buffer_contents(self) -> None:
         seed = await self.select_seed()
-        async with self.redis_conn.lock("buffer_lock", timeout=180):
-            if (
-                await self.redis_conn.hget('prompt', 'next') is None
-                and
-                await self.redis_conn.hget('image', 'next') is None
+        try:
+            async with self.redis_conn.lock(
+                "buffer_lock", 
+                timeout=self.lock_timeout,
+                blocking_timeout=self.acquire_timeout
             ):
-                print("[INFO] Generating content buffer")
-                prompt = await self.generate_prompt(seed)
-                assert prompt is not None, "[ERROR] Prompt generation failed"
+                if (
+                    await self.redis_conn.hget('prompt', 'next') is None
+                    and
+                    await self.redis_conn.hget('image', 'next') is None
+                ):
+                    print("[INFO] Generating content buffer")
+                    prompt = await self.generate_prompt(seed)
+                    assert prompt is not None, "[ERROR] Prompt generation failed"
 
-                prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, 3))
-                await self.set_next_prompt(prompt_dict)
+                    prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, 3))
+                    await self.set_next_prompt(prompt_dict)
 
-                image = await self.generate_image(prompt)
-                assert image is not None, "[ERROR] Image generation failed"
+                    image = await self.generate_image(prompt)
+                    assert image is not None, "[ERROR] Image generation failed"
 
-                encoding = encode_image(image)
-                await self.set_next_image(encoding)
-                print("[INFO] Content buffering complete")
+                    encoding = encode_image(image)
+                    await self.set_next_image(encoding)
+                    print("[INFO] Content buffering complete")
+        
+        except LockError:
+            print("[INFO] Worker could not acquire lock, moving on.")
+
+        except Exception as e:
+            print(f"[ERROR] An unexpected error occurred: {str(e)}")
 
     async def promote_buffer(self) -> None:
-        async with self.redis_conn.lock("promotion_lock", timeout=60):
-            if (
-                await self.redis_conn.hget('prompt', 'next') is not None
-                and
-                await self.redis_conn.hget('image', 'next') is not None
+        try:
+            async with self.redis_conn.lock(
+                "promotion_lock", 
+                timeout=self.lock_timeout,
+                blocking_timeout=self.acquire_timeout
             ):
-                print("[INFO] Promoting content buffer")
-                image = await self.redis_conn.hget('image', 'next')
-                prompt = await self.redis_conn.hget('prompt', 'next')
-                assert image is not None and prompt is not None, "[ERROR] Content buffer error, NoneType encountered"
+                if (
+                    await self.redis_conn.hget('prompt', 'next') is not None
+                    and
+                    await self.redis_conn.hget('image', 'next') is not None
+                ):
+                    print("[INFO] Promoting content buffer")
+                    image = await self.redis_conn.hget('image', 'next')
+                    prompt = await self.redis_conn.hget('prompt', 'next')
+                    assert image is not None and prompt is not None, "[ERROR] Content buffer error, NoneType encountered"
 
-                await self.redis_conn.hset('image', 'current', image)
-                await self.redis_conn.hset('prompt', 'current', prompt)
-                await self.redis_conn.hdel('image', 'next')
-                await self.redis_conn.hdel('prompt', 'next')
-                print("[INFO] Buffer promotion complete")
+                    await self.redis_conn.hset('image', 'current', image)
+                    await self.redis_conn.hset('prompt', 'current', prompt)
+                    await self.redis_conn.hdel('image', 'next')
+                    await self.redis_conn.hdel('prompt', 'next')
+                    print("[INFO] Buffer promotion complete")
+
+        except LockError:
+            print("[INFO] Worker could not acquire lock, moving on.")
+
+        except Exception as e:
+            print(f"[ERROR] An unexpected error occurred: {str(e)}")
 
     async def generate_prompt(self, seed: str) -> str:
         print("[INFO] Generating prompt...")

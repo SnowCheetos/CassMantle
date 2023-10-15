@@ -293,7 +293,7 @@ function displayPrompt(promptData) {
                 if (score > 0.1) {
                     var ph = `${(score * 100).toFixed(2)}`;
                 } else {
-                    var ph = "Way Off...";
+                    var ph = "try again...";
                 }
             } else {
                 var ph = "";
