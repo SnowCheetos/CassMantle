@@ -76,7 +76,7 @@ async def connect_clock(websocket: WebSocket, session_id: str=Cookie(None)):
         print('[INFO] Client Disconnected.')
 
     finally:
-        await server.flush_session(session_id)
+        await server.remove_connection(session_id)
 
 @app.get("/client/status")
 @limiter.limit("2/second")
