@@ -38,7 +38,6 @@ class Backend:
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
         self.auth_header = {"Authorization": f"Bearer {API_TOKEN}"}
-
         self.wv = KeyedVectors.load("data/word2vec.wordvectors", mmap='r')
 
     async def select_style(self) -> str:
@@ -58,7 +57,7 @@ class Backend:
         await self.redis_conn.hset('image', 'status', 'idle')
 
         seed = await self.select_seed()
-        async with self.redis_conn.lock("startup_lock", timeout=180):
+        async with self.redis_conn.lock("startup_lock", timeout=300):
             if (
                 await self.redis_conn.hget('prompt', 'current') is None
                 and
