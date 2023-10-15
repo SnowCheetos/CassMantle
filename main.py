@@ -54,15 +54,17 @@ async def initialize_session(request: Request, response: Response):
 
 @app.websocket("/clock")
 # @limiter.limit("2/second")
-async def connect_clock(websocket: WebSocket):
+async def connect_clock(websocket: WebSocket, session_id: str=Cookie(None)):
     await websocket.accept()
-    print('[INFO] Client Connected.')
+    print(f'[INFO] Client {session_id} Connected.')
     try:
         while True:
+            await server.add_client(session_id)
             await asyncio.sleep(1)
             time = await server.fetch_clock()
+            conns = await server.player_count()
             reset = bool(await server.redis_conn.exists('reset'))
-            await websocket.send_json({"time": time, "reset": reset})
+            await websocket.send_json({"time": time, "reset": reset, "conns": conns})
     
     except WebSocketException:
         print('[INFO] Client Disconnected.')
@@ -72,6 +74,9 @@ async def connect_clock(websocket: WebSocket):
     
     except ConnectionClosedOK:
         print('[INFO] Client Disconnected.')
+
+    finally:
+        await server.flush_session(session_id)
 
 @app.get("/client/status")
 @limiter.limit("2/second")

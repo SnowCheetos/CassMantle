@@ -25,6 +25,29 @@ html, body {
     opacity: 0.8; 
 }
 
+#connections {
+    display: flex;
+    position: fixed;
+    bottom: 0px;
+    left: 30px;
+    z-index: 3000;
+    justify-content: center;
+    text-align: center;
+    align-items: center;
+}
+
+.person {
+    width: 40px;
+    height: 40px;
+    margin-right: 10px;
+}
+
+.counts {
+    font-size: 24px;
+    color: white;
+    font-weight: bold;
+}
+
 #logo {
     display: flex;
     position: fixed;
@@ -106,7 +129,7 @@ html, body {
     color: #fff;
     text-align: center;
     padding: 15px;
-    font-size: 16px;
+    font-size: 18px;
     display: none; /* Hidden by default */
     z-index: 1000;
 }
@@ -119,7 +142,7 @@ html, body {
     color: #fff;
     text-align: center;
     padding: 1em;
-    font-size: 14px;
+    font-size: 18px;
     font-family: Courier New, monospace;
     box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
     display: none; /* Initially hidden */

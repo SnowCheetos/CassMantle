@@ -27,12 +27,24 @@ class Server(Backend):
         await self.reset_client(session)
         await self.redis_conn.sadd('sessions', session)
 
+    async def add_client(self, session: str) -> None:
+        if not await self.redis_conn.sismember('session', session):
+            await self.redis_conn.sadd('sessions', session)
+
     async def reset_client(self, session: str) -> None:
         await self.redis_conn.delete(session)
         prompt = await self.fetch_current_prompt()
         contents = {'max': self.min_score, 'won': 0, 'attempts': 0}
         for m in prompt['masks']: contents.update({str(m): 0.0})
         await self.redis_conn.hset(session, mapping=contents)
+
+    async def flush_session(self, session: str) -> None:
+        await self.redis_conn.delete(session)
+        await self.redis_conn.srem('sessions', session)
+
+    async def player_count(self) -> int:
+        connections = await self.redis_conn.smembers('sessions')
+        return len(connections)
 
     async def increment_attempt(self, session: str) -> None:
         await self.redis_conn.hincrby(session, 'attempts', 1)
@@ -83,7 +95,12 @@ class Server(Backend):
     async def fetch_prompt_json(self, session_id: str) -> str:
         prompt = await self.fetch_current_prompt()
         scores = await self.fetch_client_scores(session_id)
-        attempts = int((await self.redis_conn.hget(session_id, 'attempts')).decode())
+        attempts = await self.redis_conn.hget(session_id, 'attempts')
+        while attempts is None:
+            await asyncio.sleep(0.1)
+            attempts = await self.redis_conn.hget(session_id, 'attempts')
+        
+        attempts = int(attempts.decode())
 
         if (await self.redis_conn.hget(session_id, 'won')).decode() == "1":
             prompt['masks'] = []

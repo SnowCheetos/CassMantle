@@ -23,6 +23,11 @@ function hideLoadingPage() {
     loadingContainer.style.display = "none";
 }
 
+function updatePlayerCount(count) {
+    const counts = document.querySelector(".counts");
+    counts.textContent = count;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     createClockElement();
 
@@ -121,6 +126,7 @@ function initializeApp() {
         ws.addEventListener("message", event => {
             const data = JSON.parse(event.data);
             updateClock(data.time);
+            updatePlayerCount(data.conns);
 
             if (data.reset) {
                 clearPrompt();
@@ -229,7 +235,7 @@ function createSubmitButton(app) {
     submitButton.style.bottom = '10px';    // 10px from the bottom of the page
     submitButton.style.left = '50%';       // Center the button
     submitButton.style.transform = 'translateX(-50%)'; // Ensure it's centered
-    submitButton.style.fontSize = '16px';
+    submitButton.style.fontSize = '18px';
     submitButton.style.padding = '4px';
     submitButton.style.paddingLeft = '25px';
     submitButton.style.marginBottom = '10px';
@@ -300,7 +306,7 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "16px";
+            inputField.style.fontSize = "18px";
             inputField.style.textAlign = 'center';
             inputField.style.fontFamily = "Courier New, monospace";
             inputField.style.margin = "3px";
@@ -316,7 +322,7 @@ function displayPrompt(promptData) {
             } else {
                 span.textContent = " " + token;
             }
-            span.style.fontSize = "16px";
+            span.style.fontSize = "18px";
             span.style.fontFamily = "Courier New, monospace";
             // span.style.margin = "3px";
             promptContainer.appendChild(span);
