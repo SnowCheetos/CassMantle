@@ -135,14 +135,17 @@ function initializeApp() {
                 method: "GET",
                 credentials: 'include'
             });
-                 //?session_id=${sessionId}`);
             const data = await response.json();
             displayImage(data.image);
             if (prompt === true) {
                 displayPrompt(data.prompt);
             } else {
                 displayPrompt({
-                    tokens: ['Congratulations, you got it!', 'Good luck next round.'],
+                    tokens: [
+                        `Congratulations, you got it in ${data.prompt.attempts} `,
+                        (data.prompt.attempts > 1) ? 'attempts!': 'attempt!', 
+                        'Good luck next round.'
+                    ],
                     masks: [],
                 });
             }
@@ -219,7 +222,6 @@ function createSubmitButton(app) {
     submitButton.id = 'submit-button';
     submitButton.textContent = 'Guess';
 
-
     // Append the submit button to the document body (or to a specific container if needed)
     document.body.appendChild(submitButton);
 
@@ -281,11 +283,20 @@ function displayPrompt(promptData) {
             var score = parseFloat(promptData.scores[index]);
             const inputField = document.createElement("input");
             const span = document.createElement("span");
+            if (score > 0) {
+                if (score > 0.1) {
+                    var ph = `${(score * 100).toFixed(2)}`;
+                } else {
+                    var ph = "Way Off...";
+                }
+            } else {
+                var ph = "";
+            }
             span.textContent = " ";
             promptContainer.appendChild(span);
             inputField.type = "text";
             inputField.id = `${index}`;
-            inputField.placeholder = (score > 0) ? `${(score * 100).toFixed(2)} %` : "";
+            inputField.placeholder = ph; //(score > 0) ? `${(score * 100).toFixed(2)} %` : "Way Off...";
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';

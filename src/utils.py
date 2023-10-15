@@ -116,6 +116,7 @@ def select_descriptive_words(inputs: str, prompt: str, num_words: int=2) -> List
         and all(char not in string.punctuation for char in word)  # Exclude punctuation
         and "'" not in word
         and "-" not in word
+        and "'" not in word
         and pos not in ['NNP', 'NNPS']  # Exclude proper nouns
         and word not in skips
     ]

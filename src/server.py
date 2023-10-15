@@ -30,9 +30,12 @@ class Server(Backend):
     async def reset_client(self, session: str) -> None:
         await self.redis_conn.delete(session)
         prompt = await self.fetch_current_prompt()
-        contents = {'max': self.min_score, 'won': 0}
+        contents = {'max': self.min_score, 'won': 0, 'attempts': 0}
         for m in prompt['masks']: contents.update({str(m): 0.0})
         await self.redis_conn.hset(session, mapping=contents)
+
+    async def increment_attempt(self, session: str) -> None:
+        await self.redis_conn.hincrby(session, 'attempts', 1)
 
     async def fetch_current_image(self) -> Image.Image:
         image_bytes = await self.redis_conn.hget('image', 'current')
@@ -56,7 +59,7 @@ class Server(Backend):
             })
         scores = await self.compute_scores(pairs)
         scores = await self.set_client_scores(session, scores)
-    
+        await self.increment_attempt(session)
         return scores
 
     async def set_client_scores(self, session: str, scores: Dict[str, str]) -> Dict[str, str]:
@@ -80,6 +83,7 @@ class Server(Backend):
     async def fetch_prompt_json(self, session_id: str) -> str:
         prompt = await self.fetch_current_prompt()
         scores = await self.fetch_client_scores(session_id)
+        attempts = int((await self.redis_conn.hget(session_id, 'attempts')).decode())
 
         if (await self.redis_conn.hget(session_id, 'won')).decode() == "1":
             prompt['masks'] = []
@@ -95,7 +99,7 @@ class Server(Backend):
                 else:
                     prompt['tokens'][mask] = '*'
 
-        prompt.update({'scores': scores})
+        prompt.update({'scores': scores, 'attempts': attempts})
         return prompt
 
     async def fetch_masked_image(self, session: str) -> Image.Image:

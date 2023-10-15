@@ -25,9 +25,14 @@ class Backend:
         with open('api_key.txt', 'r') as f: API_TOKEN = f.readline()
         
         self.seeds = []
-        with open('data/seeds.txt') as f:
+        with open('data/seeds.txt', 'r') as f:
             for line in f.readlines():
                 self.seeds.append(line)
+
+        self.styles = []
+        with open('data/styles.txt', 'r') as f:
+            for line in f.readlines():
+                self.styles.append(line)
 
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
@@ -35,6 +40,9 @@ class Backend:
         self.auth_header = {"Authorization": f"Bearer {API_TOKEN}"}
 
         self.wv = KeyedVectors.load("data/word2vec.wordvectors", mmap='r')
+
+    async def select_style(self) -> str:
+        return self.styles[random.randint(0, len(self.styles) - 1)]
 
     async def select_seed(self) -> str:
         return self.seeds[random.randint(0, len(self.seeds) - 1)]
@@ -132,7 +140,8 @@ class Backend:
                 "parameters": {
                     "min_new_tokens": 32,
                     "max_new_tokens": 96,
-                    "do_sample": True
+                    "do_sample": True,
+                    "num_beams": 11
                 }
             },
             max_retries=self.max_retries,
@@ -148,16 +157,16 @@ class Backend:
             return None
 
     async def generate_image(self, prompt: str) -> Image.Image:
-        print("[INFO] Generating image...")
         await self.redis_conn.hset('image', 'status', 'busy')
-
+        style = await self.select_style()
+        print(f"[INFO] Generating image with {style} style...")
         response = await api_call(
             method="POST",
             url=self.diffuser_url,
             headers=self.auth_header,
             json={
-                "inputs": prompt,
-                "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative'}
+                "inputs": prompt + f' {style} style.',
+                "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative, weird, bad'}
             },
             max_retries=self.max_retries,
             timeout=90,
@@ -170,18 +179,6 @@ class Backend:
         else:
             print("[ERROR] Image generation failed.")
             return None
-        
-    # async def compute_scores(self, pairs: Dict[str, Dict[str, str]]) -> Dict[str, List[str]]:
-    #     response = await api_call(
-    #         method="POST",
-    #         url='http://localhost:9000/compute_scores',
-    #         # headers=self.auth_header,
-    #         json=pairs,
-    #         timeout=3,
-    #         retry_on_status_codes={503},
-    #     )
-    #     if response is not None: return response.json()
-    #     else: raise Exception("[ERROR] Score calculation failed.")
     
     def most_similar(self, word: str, topn: int=50) -> List[str]:
         return self.wv.most_similar(word, topn=topn)
