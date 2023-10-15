@@ -29,7 +29,7 @@ html, body {
     display: flex;
     position: fixed;
     bottom: 0px;
-    left: 30px;
+    left: 10px;
     z-index: 3000;
     justify-content: center;
     text-align: center;
