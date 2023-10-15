@@ -22,17 +22,17 @@ class Backend:
         ) -> None:
         
         self.min_score = min_score
-        with open('api_key.txt', 'r') as f: API_TOKEN = f.readline()
+        with open('api_key.txt', 'r') as f: API_TOKEN = f.readline().strip()
         
         self.seeds = []
         with open('data/seeds.txt', 'r') as f:
             for line in f.readlines():
-                self.seeds.append(line)
+                self.seeds.append(line.strip())
 
         self.styles = []
         with open('data/styles.txt', 'r') as f:
             for line in f.readlines():
-                self.styles.append(line)
+                self.styles.append(line.strip())
 
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
@@ -141,7 +141,7 @@ class Backend:
                     "min_new_tokens": 32,
                     "max_new_tokens": 96,
                     "do_sample": True,
-                    "num_beams": 11
+                    "num_beams": 5
                 }
             },
             max_retries=self.max_retries,
