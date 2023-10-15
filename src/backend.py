@@ -35,7 +35,7 @@ class Backend:
             for line in f.readlines():
                 self.styles.append(line.strip())
 
-        self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60))
+        # self.http_session = aiohttp.ClientSession()
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
@@ -133,7 +133,7 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'busy')
 
         response = await api_call(
-            self.http_session,
+            # self.http_session,
             method="POST",
             url=self.llm_url,
             headers=self.auth_header,
@@ -163,7 +163,7 @@ class Backend:
         style = await self.select_style()
         print(f"[INFO] Generating image with {style} style...")
         response = await api_call(
-            self.http_session,
+            # self.http_session,
             method="POST",
             url=self.diffuser_url,
             headers=self.auth_header,
@@ -213,6 +213,6 @@ class Backend:
         return image.filter(ImageFilter.GaussianBlur(blur))
 
 
-if __name__ == "__main__":
-    b = Backend()
-    asyncio.run(b.startup())
+# if __name__ == "__main__":
+#     b = Backend()
+#     asyncio.run(b.startup())
