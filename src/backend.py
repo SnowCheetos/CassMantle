@@ -203,16 +203,16 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
-            print(response)
+            await asyncio.sleep(0)
             return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
         else:
             print("[ERROR] Prompt generation failed.")
             return None
 
     async def generate_image(self, prompt: str) -> Image.Image:
-        await self.redis_conn.hset('image', 'status', 'busy')
         style = await self.select_style()
         print(f"[INFO] Generating image with {style} style...")
+        await self.redis_conn.hset('image', 'status', 'busy')
         response = await api_call(
             # self.http_session,
             method="POST",
