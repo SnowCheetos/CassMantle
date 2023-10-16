@@ -101,11 +101,12 @@ class Backend:
         return prompt
 
     async def init_image(self, prompt: str) -> None:
+        print(prompt)
         image = await self.generate_image(prompt)
 
         assert image is not None, "[ERROR] Image generation failed"
         encoding = encode_image(image)
-        
+
         await self.redis_conn.hset('image', 'current', encoding)
 
     async def set_next_prompt(self, prompt: str) -> None:
