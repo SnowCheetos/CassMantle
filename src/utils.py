@@ -104,12 +104,15 @@ async def api_call(
 
     for retry in range(max_retries):
         try:
+            print("making request")
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout), raise_for_status=True) as session:
                 async with session.request(
                     method, url, headers=headers, json=json_payload, ssl=False
                 ) as response:
+                    print("complete")
                     # response.raise_for_status()
                     gc.collect()
+                    print(await response.read())
                     return await response.read()
 
         except aiohttp.ClientResponseError as e:
