@@ -155,8 +155,8 @@ class Server(Backend):
             # Check if time to generate new prompt
             if int(remaining_time) == int(self.time_per_prompt * 0.7):
                 # await self.buffer_contents()
-                if await self.check_generate_condition(): 
-                    asyncio.create_task(self.buffer_contents())
+                # if await self.check_generate_condition(): 
+                asyncio.create_task(self.buffer_contents())
 
             # Check if time's up
             if remaining_time <= 0.5:
