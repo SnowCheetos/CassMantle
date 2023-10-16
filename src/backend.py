@@ -77,6 +77,7 @@ class Backend:
                     prompt = await self.init_prompt(seed)
                     await self.init_image(prompt)
                     print("[INFO] Content initialization complete")
+                    return
         
         except LockError:
             print("[INFO] Worker could not acquire lock, moving on.")
@@ -197,7 +198,7 @@ class Backend:
                 }
             },
             max_retries=self.max_retries,
-            timeout=60,
+            timeout=90,
             retry_on_status_codes={503},
         )
         await self.redis_conn.hset('prompt', 'status', 'idle')
