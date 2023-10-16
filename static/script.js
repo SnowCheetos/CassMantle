@@ -261,7 +261,7 @@ function createSubmitButton(app) {
     submitButton.style.bottom = '10px';    // 10px from the bottom of the page
     submitButton.style.left = '50%';       // Center the button
     submitButton.style.transform = 'translateX(-50%)'; // Ensure it's centered
-    submitButton.style.fontSize = '20px';
+    submitButton.style.fontSize = '18px';
     submitButton.style.padding = '4px';
     submitButton.style.paddingLeft = '25px';
     submitButton.style.marginBottom = '10px';
@@ -269,7 +269,7 @@ function createSubmitButton(app) {
     submitButton.style.backgroundColor = 'transparent';
     submitButton.style.color = "white";
     submitButton.style.border = '2px solid white';
-    submitButton.style.borderRadius = '20px';
+    submitButton.style.borderRadius = '18px';
     submitButton.style.cursor = 'pointer';
     submitButton.style.fontFamily = "Tahoma, sans-serif";
     submitButton.style.textShadow = "2px 2px 3px rgba(0, 0, 0, 0.7)";
@@ -332,7 +332,7 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "20px";
+            inputField.style.fontSize = "18px";
             inputField.style.textAlign = 'center';
             inputField.style.fontFamily = "Courier New, monospace";
             inputField.style.margin = "3px";
@@ -348,7 +348,7 @@ function displayPrompt(promptData) {
             } else {
                 span.textContent = " " + token;
             }
-            span.style.fontSize = "20px";
+            span.style.fontSize = "18px";
             span.style.fontFamily = "Courier New, monospace";
             span.style.fontWeight = correct.includes(index) ? 'bold' : 'normal';
             span.style.color = correct.includes(index) ? '#66FF99' : 'white';
