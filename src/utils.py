@@ -113,6 +113,7 @@ async def api_call(
                     # response.raise_for_status()
                     gc.collect()
                     r = await response.read()
+                    response.close()
                     return r
 
         except aiohttp.ClientResponseError as e:

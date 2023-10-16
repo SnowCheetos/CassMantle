@@ -93,17 +93,19 @@ class Backend:
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
-        print(f"[INFO] Prompt: {prompt}")
+
         assert prompt is not None, "[ERROR] Prompt generation failed"
         prompt_dict = construct_prompt_dict(seed, prompt, 3)
-        await asyncio.sleep(0)
+
         await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
         return prompt
 
     async def init_image(self, prompt: str) -> None:
         image = await self.generate_image(prompt)
+
         assert image is not None, "[ERROR] Image generation failed"
         encoding = encode_image(image)
+        
         await self.redis_conn.hset('image', 'current', encoding)
 
     async def set_next_prompt(self, prompt: str) -> None:
