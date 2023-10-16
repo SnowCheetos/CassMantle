@@ -98,7 +98,7 @@ class Backend:
                         assert image is not None, "[ERROR] Image generation failed"
 
                     await self.redis_conn.hset('prompt', 'seed', prompt)
-                    prompt_dict = construct_prompt_dict(seed, prompt, self.num_masked)
+                    prompt_dict = construct_prompt_dict(self.wv, prompt, self.num_masked)
 
                     await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
 
@@ -181,7 +181,7 @@ class Backend:
 
                     await self.redis_conn.hset('prompt', 'seed', prompt)
 
-                    prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, self.num_masked))
+                    prompt_dict = json.dumps(construct_prompt_dict(self.wv, prompt, self.num_masked))
                     await self.set_next_prompt(prompt_dict)
 
                     encoding = encode_image(image)

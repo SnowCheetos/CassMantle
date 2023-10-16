@@ -10,4 +10,5 @@ safetensors
 diffusers
 pillow
 nltk
+numpy
 aiohttp[speedups]

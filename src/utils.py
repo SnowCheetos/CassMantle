@@ -2,15 +2,12 @@ import gc
 import io
 import nltk
 import string
-import random
 import aiohttp
 import asyncio
-from nltk.tokenize import word_tokenize
-from nltk.corpus import brown, stopwords
+import numpy as np
 from PIL import Image
+from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import List, Optional, Any, Dict
-
-freq_dist = nltk.FreqDist(w.lower() for w in brown.words())
 
 def encode_image(image: Image.Image) -> bytes:
     image_bytes_io = io.BytesIO()
@@ -31,13 +28,6 @@ def reconstruct_sentence(tokens: List[str]) -> str:
 def format_seconds_to_time(seconds: int) -> str:
     minutes, remaining_seconds = divmod(seconds, 60)
     return f"{minutes:02d}:{remaining_seconds:02d}"
-
-def weighted_sample_without_replacement(items, weights, k):
-    # Flatten the list
-    flat_list = [item for item, weight in zip(items, weights) for _ in range(int(weight*100))]
-    
-    # Select without replacement
-    return random.sample(flat_list, k)
 
 async def api_call(
     session: aiohttp.ClientSession,
@@ -81,53 +71,41 @@ async def api_call(
     print("Max retries reached or an error occurred.")
     return None
 
-def word_complexity(word: str) -> int:
-    # Use a large number to ensure that less frequent words get higher values
-    LARGE_NUM = 1e6
+def semantic_distance(word, word_list, model):
+    if word in model:
+        word_vector = model[word]
+        mean_vector = np.mean([model[w] for w in word_list if w in model], axis=0)
+        return np.linalg.norm(word_vector - mean_vector)
+    return 0
 
-    # The less frequent the word, the higher the complexity score from the freq_dist
-    freq_score = LARGE_NUM - freq_dist[word.lower()]
-
-    # Combine the frequency score and the word length
-    return freq_score + len(word)
-
-def select_descriptive_words(inputs: str, prompt: str, num_words: int=2) -> List[str]:
-    # Load stop words
-    stop_words = set(stopwords.words('english'))
-    
-    # Tokenize and POS tag words
-    words = word_tokenize(prompt)
-    skips = word_tokenize(inputs)
-    
+def select_descriptive_words(model, sentence, num_words=2):
+    # Tokenize and POS tag
+    words = nltk.word_tokenize(sentence)
     tagged_words = nltk.pos_tag(words)
+
+    # Filter out stopwords and get only adjectives, adverbs, and nouns
+    descriptive_tags = ['JJ', 'RB', 'NN', 'NNS', 'JJR', 'JJS', 'RBR', 'RBS']
+    filtered_words = [word for word, pos in tagged_words if word.isalpha() and pos in descriptive_tags]
+
+    # Calculate semantic distances
+    distances = [semantic_distance(word, filtered_words, model) for word in filtered_words]
+
+    # Use IDF for statistical weighing
+    vectorizer = TfidfVectorizer().fit([sentence])
+    idf_scores = vectorizer.idf_
+    idf_dict = dict(zip(vectorizer.get_feature_names_out(), idf_scores))
     
-    # Filter words
-    filtered_words = [
-        word for word, pos in tagged_words
-        if word.lower() not in stop_words
-        and all(char not in string.punctuation for char in word)  # Exclude punctuation
-        and all(not char.isdigit() for char in word)  # Exclude digits
-        and "'" not in word
-        and "-" not in word
-        and "'" not in word
-        and pos not in ['NNP', 'NNPS']  # Exclude proper nouns
-        and word not in skips
-    ]
+    # Calculate final scores for words
+    scores = [distances[i] * idf_dict.get(filtered_words[i], 1) for i in range(len(filtered_words))]
+    
+    # Select indices of words with the highest scores in the original sentence
+    selected_indices = [words.index(filtered_words[i]) for i in np.argsort(scores)[-num_words:]]
+    
+    return words, sorted(selected_indices)
 
-    word_scores = {word: word_complexity(word) for word in filtered_words}
-
-    selected_words = weighted_sample_without_replacement(
-        list(word_scores.keys()),
-        list(word_scores.values()),
-        min(num_words, len(filtered_words))
-    )
-
-    indices = sorted([words.index(word) for word in selected_words])
-    return indices
-
-def construct_prompt_dict(input_text: str, prompt: str, num_masked: int) -> Dict[str, List[str]]:
-    masks = select_descriptive_words(input_text, prompt, num_masked)
+def construct_prompt_dict(model, prompt: str, num_masked: int) -> Dict[str, List[str]]:
+    words, masks = select_descriptive_words(model, prompt, num_masked)
     return {
-        'tokens': word_tokenize(prompt),
+        'tokens': words,
         'masks': masks
     }
