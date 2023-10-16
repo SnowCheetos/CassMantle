@@ -1,8 +1,5 @@
 let dictionary = null;
 let dictionaryReady = false;
-let reconnectAttempts = 0;
-const maxReconnectAttempts = 5;
-const reconnectDelay = 5000;
 
 fetch('./data/en_US.aff').then(response => response.text()).then((affData) => {
     fetch('./data/en_US.dic').then(response => response.text()).then((dicData) => {
@@ -122,44 +119,20 @@ function initializeApp() {
         }
     }
     
-    
     function initializeWebSocket() {
         const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + "/clock");
-    
-        ws.addEventListener("open", () => {
-            console.log("WebSocket connected!");
-            reconnectAttempts = 0; // Reset the attempts counter once successfully connected
-        });
-    
+
         ws.addEventListener("message", event => {
             const data = JSON.parse(event.data);
             updateClock(data.time);
             updatePlayerCount(data.conns);
-    
+
             if (data.reset) {
                 clearPrompt();
                 fetchAndDisplayContents(true);
             }
         });
-    
-        ws.addEventListener("close", (e) => {
-            if (reconnectAttempts < maxReconnectAttempts) {
-                console.log(`WebSocket connection closed. Reconnecting in ${reconnectDelay / 1000} seconds...`);
-                setTimeout(() => {
-                    reconnectAttempts++;
-                    initializeWebSocket();
-                }, reconnectDelay);
-            } else {
-                console.log("Max reconnect attempts reached. Please check your connection or the server.");
-            }
-        });
-    
-        ws.addEventListener("error", (error) => {
-            console.error("WebSocket Error: ", error);
-            // WebSocket will emit a 'close' event after 'error', so the reconnect logic will be handled there.
-        });
     }
-    
 
     async function fetchAndDisplayContents(prompt) {
         try {
@@ -261,7 +234,7 @@ function createSubmitButton(app) {
     submitButton.style.bottom = '10px';    // 10px from the bottom of the page
     submitButton.style.left = '50%';       // Center the button
     submitButton.style.transform = 'translateX(-50%)'; // Ensure it's centered
-    submitButton.style.fontSize = '18px';
+    submitButton.style.fontSize = '20px';
     submitButton.style.padding = '4px';
     submitButton.style.paddingLeft = '25px';
     submitButton.style.marginBottom = '10px';
@@ -269,7 +242,7 @@ function createSubmitButton(app) {
     submitButton.style.backgroundColor = 'transparent';
     submitButton.style.color = "white";
     submitButton.style.border = '2px solid white';
-    submitButton.style.borderRadius = '18px';
+    submitButton.style.borderRadius = '20px';
     submitButton.style.cursor = 'pointer';
     submitButton.style.fontFamily = "Tahoma, sans-serif";
     submitButton.style.textShadow = "2px 2px 3px rgba(0, 0, 0, 0.7)";
@@ -332,7 +305,7 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "18px";
+            inputField.style.fontSize = "20px";
             inputField.style.textAlign = 'center';
             inputField.style.fontFamily = "Courier New, monospace";
             inputField.style.margin = "3px";
@@ -348,7 +321,7 @@ function displayPrompt(promptData) {
             } else {
                 span.textContent = " " + token;
             }
-            span.style.fontSize = "18px";
+            span.style.fontSize = "20px";
             span.style.fontFamily = "Courier New, monospace";
             span.style.fontWeight = correct.includes(index) ? 'bold' : 'normal';
             span.style.color = correct.includes(index) ? '#66FF99' : 'white';

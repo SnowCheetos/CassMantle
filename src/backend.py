@@ -93,7 +93,7 @@ class Backend:
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
-        await asyncio.sleep(0)
+        print(f"[INFO] Prompt: {prompt}")
         assert prompt is not None, "[ERROR] Prompt generation failed"
         prompt_dict = construct_prompt_dict(seed, prompt, 3)
         await asyncio.sleep(0)
