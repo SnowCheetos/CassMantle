@@ -142,7 +142,9 @@ class Backend:
         await self.redis_conn.hset('image', 'next', image)
 
     async def random_seed(self) -> Tuple[bool, str]:
-        if random.random(0, 1) > self.seed_epsilon:
+        r = random.random()
+        if r > self.seed_epsilon:
+            print(f"[DEBUG] Random epsilon value: {r}")
             # Use current prompt
             seed = (await self.redis_conn.hget('prompt', 'seed')).decode()
             return False, seed
