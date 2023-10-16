@@ -75,7 +75,11 @@ class Backend:
                     await self.redis_conn.hget('image', 'current') is None
                 ):
                     prompt = await self.init_prompt(seed)
+                    
+                    print("[DEBUG] Before calling init_image")
                     await self.init_image(prompt)
+                    print("[DEBUG] After calling init_image")
+
                     print("[INFO] Content initialization complete")
                     return
         
