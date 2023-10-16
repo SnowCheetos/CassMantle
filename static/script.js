@@ -1,5 +1,8 @@
 let dictionary = null;
 let dictionaryReady = false;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+const reconnectDelay = 5000;
 
 fetch('./data/en_US.aff').then(response => response.text()).then((affData) => {
     fetch('./data/en_US.dic').then(response => response.text()).then((dicData) => {
@@ -122,18 +125,41 @@ function initializeApp() {
     
     function initializeWebSocket() {
         const ws = new WebSocket((window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + "/clock");
-
+    
+        ws.addEventListener("open", () => {
+            console.log("WebSocket connected!");
+            reconnectAttempts = 0; // Reset the attempts counter once successfully connected
+        });
+    
         ws.addEventListener("message", event => {
             const data = JSON.parse(event.data);
             updateClock(data.time);
             updatePlayerCount(data.conns);
-
+    
             if (data.reset) {
                 clearPrompt();
                 fetchAndDisplayContents(true);
             }
         });
+    
+        ws.addEventListener("close", (e) => {
+            if (reconnectAttempts < maxReconnectAttempts) {
+                console.log(`WebSocket connection closed. Reconnecting in ${reconnectDelay / 1000} seconds...`);
+                setTimeout(() => {
+                    reconnectAttempts++;
+                    initializeWebSocket();
+                }, reconnectDelay);
+            } else {
+                console.log("Max reconnect attempts reached. Please check your connection or the server.");
+            }
+        });
+    
+        ws.addEventListener("error", (error) => {
+            console.error("WebSocket Error: ", error);
+            // WebSocket will emit a 'close' event after 'error', so the reconnect logic will be handled there.
+        });
     }
+    
 
     async function fetchAndDisplayContents(prompt) {
         try {

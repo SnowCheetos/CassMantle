@@ -159,6 +159,7 @@ def select_descriptive_words(inputs: str, prompt: str, num_words: int=2) -> List
         word for word, pos in tagged_words
         if word.lower() not in stop_words
         and all(char not in string.punctuation for char in word)  # Exclude punctuation
+        and all(not char.isdigit() for char in word)  # Exclude digits
         and "'" not in word
         and "-" not in word
         and "'" not in word
