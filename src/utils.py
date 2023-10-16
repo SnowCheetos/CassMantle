@@ -108,7 +108,6 @@ async def api_call(
                 async with session.request(
                     method, url, headers=headers, json=json_payload, ssl=False
                 ) as response:
-                    await session.close()
                     response.raise_for_status()
                     gc.collect()
                     return await response.read()
