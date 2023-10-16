@@ -11,4 +11,5 @@ diffusers
 pillow
 nltk
 numpy
+scikit-learn
 aiohttp[speedups]
