@@ -80,6 +80,7 @@ def weighted_sample_without_replacement(items, weights, k):
 #     return None
 
 async def api_call(
+    session: aiohttp.ClientSession,
     method: str,
     url: str,
     headers: Optional[Dict[str, str]] = None,
@@ -88,33 +89,21 @@ async def api_call(
     timeout: int = 10,
     retry_on_status_codes: Optional[set[int]] = None,
 ) -> Optional[aiohttp.ClientResponse]:
-    """
-    Perform an API call with retries using aiohttp.
-
-    :param method: HTTP method
-    :param url: URL to call
-    :param headers: Headers to include in the request
-    :param json: JSON payload to include in the request
-    :param max_retries: Maximum number of retries
-    :param timeout: Request timeout
-    :param retry_on_status_codes: Set of HTTP status codes that should trigger a retry
-    :return: aiohttp.ClientResponse object or None if call was unsuccessful
-    """
     retry_on_status_codes = retry_on_status_codes or {503}
 
     for retry in range(max_retries):
         try:
             print("[INFO] Making request...")
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout), raise_for_status=True) as session:
-                async with session.request(
-                    method, url, headers=headers, json=json_payload, ssl=False
-                ) as response:
-                    print("[INFO] Request complete.")
-                    # response.raise_for_status()
-                    r = await response.read()
-                    response.close()
-                    # gc.collect()
-                    return r
+            # async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout), raise_for_status=True) as session:
+            async with session.request(
+                method, url, headers=headers, json=json_payload, ssl=False
+            ) as response:
+                print("[INFO] Request complete.")
+                # response.raise_for_status()
+                r = await response.read()
+                response.close()
+                # gc.collect()
+                return r
 
         except aiohttp.ClientResponseError as e:
             if e.status in retry_on_status_codes:

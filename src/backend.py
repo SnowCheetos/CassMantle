@@ -1,7 +1,9 @@
 import io
+import gc
 import json
 import asyncio
 import random
+import aiohttp
 import aioredis
 
 from aioredis.exceptions import LockError
@@ -74,11 +76,14 @@ class Backend:
                     and
                     await self.redis_conn.hget('image', 'current') is None
                 ):
-                    prompt = await self.init_prompt(seed)
-                    
-                    # print("[DEBUG] Before calling init_image")
-                    await self.init_image(prompt)
-                    # print("[DEBUG] After calling init_image")
+                    async with aiohttp.ClientSession(
+                        timeout=aiohttp.ClientTimeout(total=60), 
+                        raise_for_status=True
+                    ) as http_session:
+                        
+                        prompt = await self.init_prompt(http_session, seed)
+                        gc.collect()
+                        await self.init_image(http_session, prompt)
 
                     print("[INFO] Content initialization complete")
                     return
@@ -91,8 +96,8 @@ class Backend:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
             return
 
-    async def init_prompt(self, seed: str) -> str:
-        prompt = await self.generate_prompt(seed)
+    async def init_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
+        prompt = await self.generate_prompt(http_session, seed)
 
         assert prompt is not None, "[ERROR] Prompt generation failed"
         prompt_dict = construct_prompt_dict(seed, prompt, 3)
@@ -100,9 +105,8 @@ class Backend:
         await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
         return prompt
 
-    async def init_image(self, prompt: str) -> None:
-        print(prompt)
-        image = await self.generate_image(prompt)
+    async def init_image(self, http_session: aiohttp.ClientSession, prompt: str) -> None:
+        image = await self.generate_image(http_session, prompt)
 
         assert image is not None, "[ERROR] Image generation failed"
         encoding = encode_image(image)
@@ -129,14 +133,18 @@ class Backend:
                     await self.redis_conn.hget('image', 'next') is None
                 ):
                     print("[INFO] Generating content buffer")
-                    prompt = await self.generate_prompt(seed)
-                    assert prompt is not None, "[ERROR] Prompt generation failed"
+                    async with aiohttp.ClientSession(
+                        timeout=aiohttp.ClientTimeout(total=60), 
+                        raise_for_status=True
+                    ) as http_session:                       
+                        prompt = await self.generate_prompt(http_session, seed)
+                        assert prompt is not None, "[ERROR] Prompt generation failed"
+                        gc.collect()
+                        image = await self.generate_image(http_session, prompt)
+                        assert image is not None, "[ERROR] Image generation failed"
 
                     prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, 3))
                     await self.set_next_prompt(prompt_dict)
-
-                    image = await self.generate_image(prompt)
-                    assert image is not None, "[ERROR] Image generation failed"
 
                     encoding = encode_image(image)
                     await self.set_next_image(encoding)
@@ -181,12 +189,12 @@ class Backend:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
             return
 
-    async def generate_prompt(self, seed: str) -> str:
+    async def generate_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
         print("[INFO] Generating prompt...")
         await self.redis_conn.hset('prompt', 'status', 'busy')
 
         response = await api_call(
-            # self.http_session,
+            http_session,
             method="POST",
             url=self.llm_url,
             headers=self.auth_header,
@@ -212,12 +220,12 @@ class Backend:
             print("[ERROR] Prompt generation failed.")
             return None
 
-    async def generate_image(self, prompt: str) -> Image.Image:
+    async def generate_image(self, http_session: aiohttp.ClientSession, prompt: str) -> Image.Image:
         style = await self.select_style()
         print(f"[INFO] Generating image with {style} style...")
         await self.redis_conn.hset('image', 'status', 'busy')
         response = await api_call(
-            # self.http_session,
+            http_session,
             method="POST",
             url=self.diffuser_url,
             headers=self.auth_header,

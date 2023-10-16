@@ -112,7 +112,7 @@ class Server(Backend):
                 score = scores.get(str(mask))
                 if score:
                     if float(score) == 1.0:  
-                        prompt['masks'].pop(i)
+                        prompt['masks'][i] = -1
                         prompt['correct'].append(mask)
                     else:
                         prompt['tokens'][mask] = '*'

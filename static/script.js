@@ -98,7 +98,7 @@ function initializeApp() {
         try {
             const response = await fetch("/client/status", {
                 method: "GET",
-                credentials: 'include', // Ensure cookies are included with the request
+                credentials: 'include',
             });
             
             const data = await response.json();
@@ -147,11 +147,13 @@ function initializeApp() {
             } else {
                 displayPrompt({
                     tokens: [
-                        `Congratulations, you got it in ${data.prompt.attempts} `,
+                        'Congratulations, you got it in',
+                        `${data.prompt.attempts} `,
                         (data.prompt.attempts > 1) ? 'attempts!': 'attempt!', 
                         'Good luck next round.'
                     ],
                     masks: [],
+                    correct: [1]
                 });
             }
         } catch (err) {
