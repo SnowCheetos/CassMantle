@@ -111,9 +111,9 @@ async def api_call(
                 ) as response:
                     print("[INFO] Request complete.")
                     # response.raise_for_status()
-                    gc.collect()
                     r = await response.read()
                     response.close()
+                    # gc.collect()
                     return r
 
         except aiohttp.ClientResponseError as e:
