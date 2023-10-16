@@ -93,8 +93,10 @@ class Backend:
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
+        print(prompt)
         assert prompt is not None, "[ERROR] Prompt generation failed"
         prompt_dict = construct_prompt_dict(seed, prompt, 3)
+        print(prompt_dict)
         await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
         return prompt
 
@@ -208,6 +210,7 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
+            print(response)
             return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
         else:
             print("[ERROR] Prompt generation failed.")
