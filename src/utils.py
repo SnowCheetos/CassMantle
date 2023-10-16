@@ -1,5 +1,5 @@
-import io
 import gc
+import io
 import nltk
 import string
 import random
@@ -39,46 +39,6 @@ def weighted_sample_without_replacement(items, weights, k):
     # Select without replacement
     return random.sample(flat_list, k)
 
-# async def api_call(
-#     session: aiohttp.ClientSession,  # Pass session as a parameter
-#     method: str,
-#     url: str,
-#     headers: Optional[Dict[str, str]] = None,
-#     json_payload: Optional[Dict[str, Any]] = None,  # Avoid shadowing the 'json' module
-#     max_retries: int = 5,
-#     timeout: int = 10,
-#     retry_on_status_codes: Optional[set[int]] = None,
-# ) -> Optional[aiohttp.ClientResponse]:
-#     retry_on_status_codes = retry_on_status_codes or {503}
-
-#     for retry in range(max_retries):
-#         try:
-#             # Use the provided session
-#             async with session.request(
-#                 method, url, headers=headers, json=json_payload, timeout=aiohttp.ClientTimeout(total=timeout)
-#             ) as response:
-#                 response.raise_for_status()
-                
-#                 return await response.read()
-
-#         except aiohttp.ClientResponseError as e:
-#             if e.status in retry_on_status_codes:
-#                 print(
-#                     f"Retry {retry + 1}/{max_retries}: "
-#                     f"Status code {e.status} received from {url}"
-#                 )
-#                 await asyncio.sleep(retry * 3)  # Implementing exponential backoff
-#                 continue
-#             else:
-#                 print(f"HTTP error occurred: {e}")
-#                 break
-#         except Exception as e:
-#             print(f"An error occurred: {e}")
-#             break
-    
-#     print("Max retries reached or an error occurred.")
-#     return None
-
 async def api_call(
     session: aiohttp.ClientSession,
     method: str,
@@ -86,7 +46,6 @@ async def api_call(
     headers: Optional[Dict[str, str]] = None,
     json_payload: Optional[Dict[str, Any]] = None,
     max_retries: int = 5,
-    timeout: int = 10,
     retry_on_status_codes: Optional[set[int]] = None,
 ) -> Optional[aiohttp.ClientResponse]:
     retry_on_status_codes = retry_on_status_codes or {503}
@@ -94,24 +53,22 @@ async def api_call(
     for retry in range(max_retries):
         try:
             print("[INFO] Making request...")
-            # async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout), raise_for_status=True) as session:
             async with session.request(
                 method, url, headers=headers, json=json_payload, ssl=False
             ) as response:
                 print("[INFO] Request complete.")
-                # response.raise_for_status()
                 r = await response.read()
                 response.close()
-                # gc.collect()
                 return r
 
         except aiohttp.ClientResponseError as e:
             if e.status in retry_on_status_codes:
+                gc.collect()
                 print(
                     f"Retry {retry + 1}/{max_retries}: "
                     f"Status code {e.status} received from {url}"
                 )
-                await asyncio.sleep(retry * 3)  # Implementing exponential backoff
+                await asyncio.sleep((retry + 1) * 10)
                 continue
             else:
                 print(f"HTTP error occurred: {e}")

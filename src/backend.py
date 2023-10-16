@@ -9,7 +9,7 @@ import aioredis
 from aioredis.exceptions import LockError
 from gensim.models import KeyedVectors
 from PIL import Image, ImageFilter
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from src.utils import encode_image, api_call, construct_prompt_dict
 
 class Backend:
@@ -47,6 +47,8 @@ class Backend:
 
         self.lock_timeout = 120
         self.acquire_timeout = 2
+        self.num_masked = 2
+        self.seed_epsilon = 0.2
 
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
@@ -81,9 +83,27 @@ class Backend:
                         raise_for_status=True
                     ) as http_session:
                         
-                        prompt = await self.init_prompt(http_session, seed)
+                        # prompt = await self.init_prompt(http_session, seed)
+                        # gc.collect()
+
+                        # await self.init_image(http_session, prompt)
+                        # gc.collect()
+
+                        prompt = await self.generate_prompt(http_session, seed, True)
                         gc.collect()
-                        await self.init_image(http_session, prompt)
+                        assert prompt is not None, "[ERROR] Prompt generation failed"
+
+                        image = await self.generate_image(http_session, prompt)
+                        gc.collect()
+                        assert image is not None, "[ERROR] Image generation failed"
+
+                    await self.redis_conn.hset('prompt', 'seed', prompt)
+                    prompt_dict = construct_prompt_dict(seed, prompt, self.num_masked)
+
+                    await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
+
+                    encoding = encode_image(image)
+                    await self.redis_conn.hset('image', 'current', encoding)
 
                     print("[INFO] Content initialization complete")
                     return
@@ -96,22 +116,24 @@ class Backend:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
             return
 
-    async def init_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
-        prompt = await self.generate_prompt(http_session, seed)
+    # async def init_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
+    #     prompt = await self.generate_prompt(http_session, seed, True)
 
-        assert prompt is not None, "[ERROR] Prompt generation failed"
-        prompt_dict = construct_prompt_dict(seed, prompt, 3)
+    #     assert prompt is not None, "[ERROR] Prompt generation failed"
 
-        await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
-        return prompt
+    #     await self.redis_conn.hset('prompt', 'seed', prompt)
+    #     prompt_dict = construct_prompt_dict(seed, prompt, self.num_masked)
 
-    async def init_image(self, http_session: aiohttp.ClientSession, prompt: str) -> None:
-        image = await self.generate_image(http_session, prompt)
+    #     await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
+    #     return prompt
 
-        assert image is not None, "[ERROR] Image generation failed"
-        encoding = encode_image(image)
+    # async def init_image(self, http_session: aiohttp.ClientSession, prompt: str) -> None:
+    #     image = await self.generate_image(http_session, prompt)
 
-        await self.redis_conn.hset('image', 'current', encoding)
+    #     assert image is not None, "[ERROR] Image generation failed"
+    #     encoding = encode_image(image)
+
+    #     await self.redis_conn.hset('image', 'current', encoding)
 
     async def set_next_prompt(self, prompt: str) -> None:
         await self.redis_conn.hset('prompt', 'next', prompt)
@@ -119,8 +141,18 @@ class Backend:
     async def set_next_image(self, image: bytes) -> None:
         await self.redis_conn.hset('image', 'next', image)
 
+    async def random_seed(self) -> Tuple[bool, str]:
+        if random.random() > self.seed_epsilon:
+            # Use current prompt
+            seed = (await self.redis_conn.hget('prompt', 'seed')).decode()
+            return False, seed
+        else:
+            seed = await self.select_seed()
+            return True, seed
+
     async def buffer_contents(self) -> None:
-        seed = await self.select_seed()
+        is_seed, seed = await self.random_seed()
+        if is_seed: print("[INFO] Restarting storyline.")
         try:
             async with self.redis_conn.lock(
                 "buffer_lock", 
@@ -133,17 +165,23 @@ class Backend:
                     await self.redis_conn.hget('image', 'next') is None
                 ):
                     print("[INFO] Generating content buffer")
+
                     async with aiohttp.ClientSession(
                         timeout=aiohttp.ClientTimeout(total=60), 
                         raise_for_status=True
-                    ) as http_session:                       
-                        prompt = await self.generate_prompt(http_session, seed)
-                        assert prompt is not None, "[ERROR] Prompt generation failed"
+                    ) as http_session:
+                        
+                        prompt = await self.generate_prompt(http_session, seed, is_seed)
                         gc.collect()
+                        assert prompt is not None, "[ERROR] Prompt generation failed"
+
                         image = await self.generate_image(http_session, prompt)
+                        gc.collect()
                         assert image is not None, "[ERROR] Image generation failed"
 
-                    prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, 3))
+                    await self.redis_conn.hset('prompt', 'seed', prompt)
+
+                    prompt_dict = json.dumps(construct_prompt_dict(seed, prompt, self.num_masked))
                     await self.set_next_prompt(prompt_dict)
 
                     encoding = encode_image(image)
@@ -189,7 +227,7 @@ class Backend:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
             return
 
-    async def generate_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
+    async def generate_prompt(self, http_session: aiohttp.ClientSession, seed: str, is_seed: bool) -> str:
         print("[INFO] Generating prompt...")
         await self.redis_conn.hset('prompt', 'status', 'busy')
 
@@ -202,39 +240,41 @@ class Backend:
                 "inputs": seed,
                 "parameters": {
                     "min_new_tokens": 32,
-                    "max_new_tokens": 96,
-                    "do_sample": True,
-                    "num_beams": 5
+                    "max_new_tokens": 96
                 }
             },
             max_retries=self.max_retries,
-            timeout=90,
             retry_on_status_codes={503},
         )
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
             await asyncio.sleep(0)
-            return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
+            if is_seed:
+                return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
+            else:
+                return '.'.join(json.loads(response)[0].get('generated_text')[len(seed)+1:].split('.')[:2]) + '.'
         else:
             print("[ERROR] Prompt generation failed.")
             return None
 
     async def generate_image(self, http_session: aiohttp.ClientSession, prompt: str) -> Image.Image:
         style = await self.select_style()
-        print(f"[INFO] Generating image with {style} style...")
+        seed = f"A {style.lower()} style piece depicting the following: "
+
+        print(f"[INFO] Generating image...")
         await self.redis_conn.hset('image', 'status', 'busy')
+        
         response = await api_call(
             http_session,
             method="POST",
             url=self.diffuser_url,
             headers=self.auth_header,
             json_payload={
-                "inputs": prompt + f' {style} style.',
-                "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative, weird, bad'}
+                "inputs": seed + prompt,
+                "parameters": {'negative_prompt': 'blurry, distorted, fake, abstract, negative'}
             },
             max_retries=self.max_retries,
-            timeout=90,
             retry_on_status_codes={503},
         )
         await self.redis_conn.hset('image', 'status', 'idle')
