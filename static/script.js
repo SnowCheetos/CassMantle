@@ -197,7 +197,7 @@ function createClockElement() {
     // Create the clock div
     const clockDiv = document.createElement('div');
     clockDiv.id = 'clock';
-    clockDiv.textContent = '00:00';
+    clockDiv.textContent = '15:00';
 
     // Append the clock div to the app container
     appContainer.appendChild(clockDiv);
@@ -226,7 +226,7 @@ function createSubmitButton(app) {
     // Create the submit button
     const submitButton = document.createElement('button');
     submitButton.id = 'submit-button';
-    submitButton.textContent = 'Guess';
+    submitButton.textContent = 'Submit';
 
     // Append the submit button to the document body (or to a specific container if needed)
     document.body.appendChild(submitButton);
@@ -235,7 +235,7 @@ function createSubmitButton(app) {
     submitButton.style.bottom = '10px';    // 10px from the bottom of the page
     submitButton.style.left = '50%';       // Center the button
     submitButton.style.transform = 'translateX(-50%)'; // Ensure it's centered
-    submitButton.style.fontSize = '18px';
+    submitButton.style.fontSize = '20px';
     submitButton.style.padding = '4px';
     submitButton.style.paddingLeft = '25px';
     submitButton.style.marginBottom = '10px';
@@ -276,7 +276,7 @@ function getScoreColor(score) {
 }
 
 function displayPrompt(promptData) {
-    const { tokens, masks } = promptData;
+    const { tokens, masks, correct } = promptData;
     const promptContainer = document.getElementById("prompt-container");
     promptContainer.style.paddingBottom = '40px';
     // // Clear any existing content, but keep the submit button
@@ -293,7 +293,7 @@ function displayPrompt(promptData) {
                 if (score > 0.1) {
                     var ph = `${(score * 100).toFixed(2)}`;
                 } else {
-                    var ph = "try again...";
+                    var ph = "try again";
                 }
             } else {
                 var ph = "";
@@ -306,7 +306,7 @@ function displayPrompt(promptData) {
             inputField.style.border = 'none';
             inputField.style.backgroundColor = 'black';
             inputField.style.color = 'white';
-            inputField.style.fontSize = "18px";
+            inputField.style.fontSize = "20px";
             inputField.style.textAlign = 'center';
             inputField.style.fontFamily = "Courier New, monospace";
             inputField.style.margin = "3px";
@@ -322,8 +322,10 @@ function displayPrompt(promptData) {
             } else {
                 span.textContent = " " + token;
             }
-            span.style.fontSize = "18px";
+            span.style.fontSize = "20px";
             span.style.fontFamily = "Courier New, monospace";
+            span.style.fontWeight = correct.includes(index) ? 'bold' : 'normal';
+            span.style.color = correct.includes(index) ? '#66FF99' : 'white';
             // span.style.margin = "3px";
             promptContainer.appendChild(span);
         }

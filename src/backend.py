@@ -76,9 +76,9 @@ class Backend:
                 ):
                     prompt = await self.init_prompt(seed)
                     
-                    print("[DEBUG] Before calling init_image")
+                    # print("[DEBUG] Before calling init_image")
                     await self.init_image(prompt)
-                    print("[DEBUG] After calling init_image")
+                    # print("[DEBUG] After calling init_image")
 
                     print("[INFO] Content initialization complete")
                     return
@@ -93,10 +93,10 @@ class Backend:
 
     async def init_prompt(self, seed: str) -> str:
         prompt = await self.generate_prompt(seed)
-        print(prompt)
+        await asyncio.sleep(0)
         assert prompt is not None, "[ERROR] Prompt generation failed"
         prompt_dict = construct_prompt_dict(seed, prompt, 3)
-        print(prompt_dict)
+        await asyncio.sleep(0)
         await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
         return prompt
 
@@ -111,13 +111,6 @@ class Backend:
 
     async def set_next_image(self, image: bytes) -> None:
         await self.redis_conn.hset('image', 'next', image)
-
-    async def check_generate_condition(self) -> bool:
-        return (
-            await self.redis_conn.hget('prompt', 'status').decode() == 'idle'
-            and
-            await self.redis_conn.hget('image', 'status').decode() == 'idle'
-        )
 
     async def buffer_contents(self) -> None:
         seed = await self.select_seed()

@@ -102,16 +102,18 @@ class Server(Backend):
             attempts = await self.redis_conn.hget(session_id, 'attempts')
         
         attempts = int(attempts.decode())
-
+        prompt.update({'correct': []})
         if (await self.redis_conn.hget(session_id, 'won')).decode() == "1":
             prompt['masks'] = []
 
         else:
-            for i, mask in enumerate(prompt['masks']): 
+            og_masks = prompt['masks'].copy()
+            for i, mask in enumerate(og_masks): 
                 score = scores.get(str(mask))
                 if score:
                     if float(score) == 1.0:  
-                        prompt['masks'][i] = -1
+                        prompt['masks'].pop(i)
+                        prompt['correct'].append(mask)
                     else:
                         prompt['tokens'][mask] = '*'
                 else:
@@ -154,8 +156,6 @@ class Server(Backend):
 
             # Check if time to generate new prompt
             if int(remaining_time) == int(self.time_per_prompt * 0.7):
-                # await self.buffer_contents()
-                # if await self.check_generate_condition(): 
                 asyncio.create_task(self.buffer_contents())
 
             # Check if time's up
