@@ -38,7 +38,6 @@ class Backend:
             for line in f.readlines():
                 self.styles.append(line.strip())
 
-        # self.http_session = aiohttp.ClientSession()
         self.max_retries = max_retries
         self.diffuser_url = diffuser_url
         self.llm_url = llm_url
@@ -83,12 +82,6 @@ class Backend:
                         timeout=aiohttp.ClientTimeout(total=60), 
                         raise_for_status=True
                     ) as http_session:
-                        
-                        # prompt = await self.init_prompt(http_session, seed)
-                        # gc.collect()
-
-                        # await self.init_image(http_session, prompt)
-                        # gc.collect()
 
                         prompt = await self.generate_prompt(http_session, seed, True)
                         gc.collect()
@@ -116,25 +109,6 @@ class Backend:
         except Exception as e:
             print(f"[ERROR] An unexpected error occurred: {str(e)}")
             return
-
-    # async def init_prompt(self, http_session: aiohttp.ClientSession, seed: str) -> str:
-    #     prompt = await self.generate_prompt(http_session, seed, True)
-
-    #     assert prompt is not None, "[ERROR] Prompt generation failed"
-
-    #     await self.redis_conn.hset('prompt', 'seed', prompt)
-    #     prompt_dict = construct_prompt_dict(seed, prompt, self.num_masked)
-
-    #     await self.redis_conn.hset('prompt', 'current', json.dumps(prompt_dict))
-    #     return prompt
-
-    # async def init_image(self, http_session: aiohttp.ClientSession, prompt: str) -> None:
-    #     image = await self.generate_image(http_session, prompt)
-
-    #     assert image is not None, "[ERROR] Image generation failed"
-    #     encoding = encode_image(image)
-
-    #     await self.redis_conn.hset('image', 'current', encoding)
 
     async def set_next_prompt(self, prompt: str) -> None:
         await self.redis_conn.hset('prompt', 'next', prompt)
@@ -169,7 +143,7 @@ class Backend:
                     await self.redis_conn.hget('image', 'next') is None
                 ):
                     print("[INFO] Generating content buffer")
-                    await self.redis_conn.incrby("episodes", 1)
+
                     async with aiohttp.ClientSession(
                         timeout=aiohttp.ClientTimeout(total=60), 
                         raise_for_status=True
@@ -182,6 +156,8 @@ class Backend:
                         image = await self.generate_image(http_session, prompt)
                         gc.collect()
                         assert image is not None, "[ERROR] Image generation failed"
+
+                    await self.redis_conn.incrby("episodes", 1)
 
                     await self.redis_conn.hset('prompt', 'seed', prompt)
 
