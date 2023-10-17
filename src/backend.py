@@ -126,6 +126,7 @@ class Backend:
         else:
             seed = await self.select_seed()
             is_seed = True
+            await self.redis_conn.set("episodes", 1)
         return is_seed, seed
 
     async def buffer_contents(self) -> None:
