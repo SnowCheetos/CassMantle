@@ -48,7 +48,7 @@ class Backend:
         self.lock_timeout = 120
         self.acquire_timeout = 2
         self.num_masked = 2
-        self.seed_epsilon = 0.15
+        self.seed_epsilon = 0.05
 
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
