@@ -144,19 +144,20 @@ class Backend:
 
     async def random_seed(self) -> Tuple[bool, str]:
         eps = int((await self.redis_conn.get("episodes")).decode())
+        is_seed = False
         if eps < self.episode_per_story:
             print(f"[DEBUG] Episode {eps}/{self.episode_per_story}")
             # Use current prompt
             seed = (await self.redis_conn.hget('prompt', 'seed')).decode()
-            return False, seed
         else:
             seed = await self.select_seed()
-            return True, seed
+            is_seed = True
+        await self.redis_conn.incrby("episodes", 1)
+        return is_seed, seed
 
     async def buffer_contents(self) -> None:
         is_seed, seed = await self.random_seed()
         if is_seed: print("[INFO] Restarting storyline.")
-        await self.redis_conn.incrby("episodes", 1)
         try:
             async with self.redis_conn.lock(
                 "buffer_lock", 
