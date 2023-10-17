@@ -122,6 +122,10 @@ class Server(Backend):
         prompt.update({'scores': scores, 'attempts': attempts})
         return prompt
 
+    async def fetch_story(self) -> Dict[str, str]:
+        story = await self.redis_conn.hgetall("story")
+        return {key.decode(): value.decode() for key, value in story.items()}
+
     async def fetch_masked_image(self, session: str) -> Image.Image:
         scores = await self.fetch_client_scores(session)
         image = await self.fetch_current_image()

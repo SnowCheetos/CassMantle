@@ -47,13 +47,16 @@ class Backend:
         self.lock_timeout = 120
         self.acquire_timeout = 2
         self.num_masked = 2
-        self.episode_per_story = 20
+        self.episode_per_story = 10
 
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
 
     async def select_seed(self) -> str:
-        return self.seeds[random.randint(0, len(self.seeds) - 1)]
+        seed = self.seeds[random.randint(0, len(self.seeds) - 1)]
+        await self.redis_conn.hset("story", mapping={"title": seed, "episode": 0})
+        # await self.redis_conn.set("episodes", 1)
+        return seed + "\nChapter 1\n\n"
 
     async def initialize_redis(self) -> aioredis.Redis:
         return await aioredis.Redis(host='localhost', decode_responses=False)
@@ -64,7 +67,6 @@ class Backend:
 
         await self.redis_conn.hset('prompt', 'status', 'idle')
         await self.redis_conn.hset('image', 'status', 'idle')
-        await self.redis_conn.set("episodes", 1)
 
         seed = await self.select_seed()
         try:
@@ -99,6 +101,7 @@ class Backend:
                     encoding = encode_image(image)
                     await self.redis_conn.hset('image', 'current', encoding)
 
+                    await self.redis_conn.hincrby("story", "episode", 1)
                     print("[INFO] Content initialization complete")
                     return
         
@@ -117,7 +120,7 @@ class Backend:
         await self.redis_conn.hset('image', 'next', image)
 
     async def random_seed(self) -> Tuple[bool, str]:
-        eps = int((await self.redis_conn.get("episodes")).decode())
+        eps = int((await self.redis_conn.hget("story", "episode")).decode())
         is_seed = False
         if eps < self.episode_per_story:
             print(f"[DEBUG] Episode {eps}/{self.episode_per_story}")
@@ -126,7 +129,7 @@ class Backend:
         else:
             seed = await self.select_seed()
             is_seed = True
-            await self.redis_conn.set("episodes", 1)
+            # await self.redis_conn.set("episodes", 1)
         return is_seed, seed
 
     async def buffer_contents(self) -> None:
@@ -157,8 +160,6 @@ class Backend:
                         image = await self.generate_image(http_session, prompt)
                         gc.collect()
                         assert image is not None, "[ERROR] Image generation failed"
-
-                    await self.redis_conn.incrby("episodes", 1)
 
                     await self.redis_conn.hset('prompt', 'seed', prompt)
 
@@ -198,6 +199,7 @@ class Backend:
                     await self.redis_conn.hset('prompt', 'current', prompt)
                     await self.redis_conn.hdel('image', 'next')
                     await self.redis_conn.hdel('prompt', 'next')
+                    await self.redis_conn.hincrby("story", "episode", 1)
                     print("[INFO] Buffer promotion complete")
 
         except LockError:
@@ -230,11 +232,10 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
 
         if response is not None:
-            await asyncio.sleep(0)
-            if is_seed:
-                return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
-            else:
-                return '.'.join(json.loads(response)[0].get('generated_text')[len(seed)+1:].split('.')[:2]) + '.'
+            # if is_seed:
+            #     return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
+            # else:
+            return ('.'.join(json.loads(response)[0].get('generated_text')[len(seed):].split('.')[:2]) + '.').split('\n')[-1]
         else:
             print("[ERROR] Prompt generation failed.")
             return None

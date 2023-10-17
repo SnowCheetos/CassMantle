@@ -141,6 +141,7 @@ function initializeApp() {
                 credentials: 'include'
             });
             const data = await response.json();
+            displayStory(data.story);
             displayImage(data.image);
             if (prompt === true) {
                 displayPrompt(data.prompt);
@@ -191,6 +192,11 @@ function displayImage(imageData) {
     imageElement.src = `data:image/jpeg;base64,${imageData}`;
 }
 
+function displayStory(storyData) {
+    const storyElement = document.getElementById("story-title");
+    storyElement.textContent = `${storyData.title}\n${storyData.episode}/10`;
+}
+
 function createClockElement() {
     // Get the app container
     const appContainer = document.getElementById('app');
@@ -206,16 +212,17 @@ function createClockElement() {
     // Add CSS styles dynamically
     clockDiv.style.fontFamily = 'Orbitron, sans-serif';
     clockDiv.style.position = 'fixed';
-    clockDiv.style.top = '30px';
+    clockDiv.style.top = '60px';
     clockDiv.style.left = '50%';
     clockDiv.style.transform = 'translateX(-50%)';
     clockDiv.style.fontSize = '2em';
     clockDiv.style.textAlign = 'center';
-    clockDiv.style.textShadow = '2px 2px 4px rgba(255, 255, 255, 0.5)';
-    clockDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-    clockDiv.style.padding = '10px 20px';
-    clockDiv.style.borderRadius = '15px';
-    clockDiv.style.boxShadow = '0px 0px 15px 5px rgba(255, 255, 255, 0.5)';
+    clockDiv.style.color = 'wheat';
+    clockDiv.style.textShadow = '2px 2px 4px rgba(10, 10, 10, 0.9)';
+    // clockDiv.style.backgroundColor = 'transparent'; //'rgba(255, 255, 255, 0.4)';
+    // clockDiv.style.padding = '10px 20px';
+    // clockDiv.style.borderRadius = '15px';
+    // clockDiv.style.boxShadow = '0px 0px 15px 5px rgba(255, 255, 255, 0.5)';
 }
 
 function createSubmitButton(app) {

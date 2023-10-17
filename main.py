@@ -102,9 +102,11 @@ async def fetch_contents(request: Request, session_id: str=Cookie(None)):
     image.save(img_io, 'JPEG')
     img_io.seek(0)
     prompt = await server.fetch_prompt_json(session_id)
+    story = await server.fetch_story()
     content = {
         "image": base64.b64encode(img_io.getvalue()).decode(),
-        "prompt": prompt
+        "prompt": prompt,
+        "story": story
     }
     return JSONResponse(content=content)
 
