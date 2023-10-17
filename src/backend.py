@@ -152,7 +152,6 @@ class Backend:
         else:
             seed = await self.select_seed()
             is_seed = True
-        await self.redis_conn.incrby("episodes", 1)
         return is_seed, seed
 
     async def buffer_contents(self) -> None:
@@ -170,7 +169,7 @@ class Backend:
                     await self.redis_conn.hget('image', 'next') is None
                 ):
                     print("[INFO] Generating content buffer")
-
+                    await self.redis_conn.incrby("episodes", 1)
                     async with aiohttp.ClientSession(
                         timeout=aiohttp.ClientTimeout(total=60), 
                         raise_for_status=True
