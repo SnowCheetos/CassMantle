@@ -48,7 +48,7 @@ class Backend:
         self.lock_timeout = 120
         self.acquire_timeout = 2
         self.num_masked = 2
-        self.seed_epsilon = 0.05
+        self.episode_per_story = 20
 
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
@@ -65,6 +65,7 @@ class Backend:
 
         await self.redis_conn.hset('prompt', 'status', 'idle')
         await self.redis_conn.hset('image', 'status', 'idle')
+        await self.redis_conn.set("episodes", 1)
 
         seed = await self.select_seed()
         try:
@@ -142,9 +143,9 @@ class Backend:
         await self.redis_conn.hset('image', 'next', image)
 
     async def random_seed(self) -> Tuple[bool, str]:
-        r = random.random()
-        if r > self.seed_epsilon:
-            print(f"[DEBUG] Random epsilon value: {r}")
+        eps = int((await self.redis_conn.get("episodes")).decode())
+        if eps < self.episode_per_story:
+            print(f"[DEBUG] Episode {eps}/{self.episode_per_story}")
             # Use current prompt
             seed = (await self.redis_conn.hget('prompt', 'seed')).decode()
             return False, seed
@@ -155,6 +156,7 @@ class Backend:
     async def buffer_contents(self) -> None:
         is_seed, seed = await self.random_seed()
         if is_seed: print("[INFO] Restarting storyline.")
+        await self.redis_conn.incrby("episodes", 1)
         try:
             async with self.redis_conn.lock(
                 "buffer_lock", 
