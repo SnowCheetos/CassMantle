@@ -77,7 +77,7 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
         await self.redis_conn.hset('image', 'status', 'idle')
 
-        chapter = random.randint(1, 10)
+        chapter = 1 #random.randint(1, 10)
 
         try:
             async with self.redis_conn.lock(
@@ -150,7 +150,7 @@ class Backend:
         return is_seed, seed
 
     async def buffer_contents(self) -> None:
-        chapter = random.randint(1, 10)
+        chapter = 1 #random.randint(1, 10)
         try:
             async with self.redis_conn.lock(
                 "buffer_lock", 
