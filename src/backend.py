@@ -47,16 +47,26 @@ class Backend:
         self.lock_timeout = 120
         self.acquire_timeout = 2
         self.num_masked = 2
-        self.episode_per_story = 10
+        self.episode_per_story = 20
 
     async def select_style(self) -> str:
         return self.styles[random.randint(0, len(self.styles) - 1)]
 
     async def select_seed(self) -> str:
         seed = self.seeds[random.randint(0, len(self.seeds) - 1)]
+        return seed
+
+    async def init_story(self, seed: str) -> None:
         await self.redis_conn.hset("story", mapping={"title": seed, "episode": 0})
-        # await self.redis_conn.set("episodes", 1)
-        return seed + "\nChapter 1\n\n"
+
+    async def set_next_story(self, seed: str) -> None:
+        await self.redis_conn.hset("story", "next", seed)
+
+    async def reset_story(self) -> None:
+        seed = (await self.redis_conn.hget("story", "next")).decode()
+        await self.init_story(seed)
+        await self.redis_conn.hdel("story", "next")
+        self.episode_per_story = random.randint(10, 30)
 
     async def initialize_redis(self) -> aioredis.Redis:
         return await aioredis.Redis(host='localhost', decode_responses=False)
@@ -68,13 +78,19 @@ class Backend:
         await self.redis_conn.hset('prompt', 'status', 'idle')
         await self.redis_conn.hset('image', 'status', 'idle')
 
-        seed = await self.select_seed()
+        chapter = random.randint(1, 10)
+
         try:
             async with self.redis_conn.lock(
                 "startup_lock", 
                 timeout=self.lock_timeout,
                 blocking_timeout=self.acquire_timeout
             ):
+                
+                seed = await self.select_seed()
+                await self.init_story(seed)
+                seed += f"\nChapter {chapter}\n\n"
+
                 if (
                     await self.redis_conn.hget('prompt', 'current') is None
                     and
@@ -122,25 +138,33 @@ class Backend:
     async def random_seed(self) -> Tuple[bool, str]:
         eps = int((await self.redis_conn.hget("story", "episode")).decode())
         is_seed = False
+        
         if eps < self.episode_per_story:
             print(f"[DEBUG] Episode {eps}/{self.episode_per_story}")
             # Use current prompt
             seed = (await self.redis_conn.hget('prompt', 'seed')).decode()
+        
         else:
             seed = await self.select_seed()
             is_seed = True
-            # await self.redis_conn.set("episodes", 1)
+        
         return is_seed, seed
 
     async def buffer_contents(self) -> None:
-        is_seed, seed = await self.random_seed()
-        if is_seed: print("[INFO] Restarting storyline.")
+        chapter = random.randint(1, 10)
         try:
             async with self.redis_conn.lock(
                 "buffer_lock", 
                 timeout=self.lock_timeout,
                 blocking_timeout=self.acquire_timeout
             ):
+                
+                is_seed, seed = await self.random_seed()
+                if is_seed: 
+                    print("[INFO] Restarting storyline.")
+                    await self.set_next_story(seed)
+                    seed += f"\nChapter {chapter}\n\n"
+
                 if (
                     await self.redis_conn.hget('prompt', 'next') is None
                     and
@@ -199,6 +223,10 @@ class Backend:
                     await self.redis_conn.hset('prompt', 'current', prompt)
                     await self.redis_conn.hdel('image', 'next')
                     await self.redis_conn.hdel('prompt', 'next')
+
+                    if await self.redis_conn.hget("story", "next") is not None:
+                        await self.reset_story()
+
                     await self.redis_conn.hincrby("story", "episode", 1)
                     print("[INFO] Buffer promotion complete")
 
@@ -235,7 +263,7 @@ class Backend:
             # if is_seed:
             #     return '.'.join(json.loads(response)[0].get('generated_text').split('.')[:2]) + '.'
             # else:
-            return ('.'.join(json.loads(response)[0].get('generated_text')[len(seed):].split('.')[:2]) + '.').split('\n')[-1]
+            return '.'.join(json.loads(response)[0].get('generated_text')[len(seed):].split('.')[:2]) + '.'
         else:
             print("[ERROR] Prompt generation failed.")
             return None
