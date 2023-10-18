@@ -66,7 +66,6 @@ class Backend:
         seed = (await self.redis_conn.hget("story", "next")).decode()
         await self.init_story(seed)
         await self.redis_conn.hdel("story", "next")
-        self.episode_per_story = random.randint(10, 30)
 
     async def initialize_redis(self) -> aioredis.Redis:
         return await aioredis.Redis(host='localhost', decode_responses=False)

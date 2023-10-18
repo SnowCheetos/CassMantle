@@ -194,7 +194,7 @@ function displayImage(imageData) {
 
 function displayStory(storyData) {
     const storyElement = document.getElementById("story-title");
-    storyElement.textContent = `${storyData.title}\n${storyData.episode}/10`;
+    storyElement.textContent = `${storyData.title}\n${storyData.episode}/20`;
 }
 
 function createClockElement() {
